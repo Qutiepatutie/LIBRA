@@ -35,6 +35,7 @@ lerna-debug.log*
 # Environments
 backend/.env
 frontend/.env.development
+.env.local
 
 #Test and Notes
 DASHBOARD_PLAN.md

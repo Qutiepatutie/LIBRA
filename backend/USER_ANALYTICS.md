@@ -97,14 +97,19 @@ code `001`, matching the design. Non-numeric or prefixed call numbers go to
 `Unclassified`; they are never silently dropped. Percentages use all eligible
 checkouts as the denominator and are rounded to two decimals.
 
-## Academic terms and profile data
+## Academic-year and semester timelines
 
 `UserProfile.education_level` accepts `senior_high` or `college`.
 `year_level` is a string containing a positive integer, e.g. `"1"` for college
 freshman or `"11"` for Grade 11. Existing profiles migrate with these fields
 blank; do not infer a student's level from their program name.
 
-`AcademicTerm` holds an academic year, semester, education level, optional
+`AcademicYear` stores the full year's label (for example `2026-2027`), education
+level, optional year-level scope, and inclusive `start_date` / `end_date`.
+`AcademicTerm` stores one semester's timeline and can link to that year through
+`academic_year_timeline` (`AcademicYear.semesters` is the reverse relationship).
+
+For compatibility, `AcademicTerm` retains its academic-year label, semester, education level, optional
 year level, and inclusive start/end dates. Null and empty year levels both
 mean the default calendar for that education level. For each academic-year /
 semester pair, an exact year-level override replaces the default **before**
@@ -113,38 +118,30 @@ term even while that default is active. Overrides do not carry into another
 academic year automatically.
 
 Each `AcademicTerm` represents one semester, not the entire academic year's
-date range. `SemesterTerm` stores its Prelims, Midterms, and Finals as child
-records through `academic_term` (`related_name="semester_terms"`). The child
-stores `semester_term` (`prelims`, `midterms`, or `finals`), `start_date`, and
-`end_date`; academic year, semester, education level, and year-level scope
-come from the parent rather than being duplicated.
+date range. Prelims, Midterms, and Finals are not tracked separately.
 
-```python
-from datetime import date
-from library.models import SemesterTerm
+A linked semester must match its year's label and education level, and its
+dates must fit inside the year's dates. A year with a specific year-level scope
+only accepts that cohort; a default year accepts any cohort. `AcademicYear.save()`
+validates the model and rejects date or scope edits that invalidate linked
+semesters. A year with linked semesters is protected from deletion. Continue to
+call `AcademicTerm.full_clean()` before saving semesters. Bulk writes bypass
+these relationship checks; date order and unique scopes also have database
+constraints. Relationship checks do not serialize concurrent writes.
 
-# `term` is the saved AcademicTerm for semester 1 and the intended cohort.
-prelims = SemesterTerm.objects.create(
-    academic_term=term,
-    semester_term=SemesterTerm.TermChoices.PRELIMS,
-    start_date=date(2026, 8, 17),
-    end_date=date(2026, 9, 28),
-)
-```
+Migration `0005_delete_semesterterm` removes the unused grading-period table
+and any records in it, preserving existing academic terms. The historical
+`0004_semesterterm` migration remains so already-migrated databases can upgrade.
+Reversing `0005` recreates an empty table; it does not restore deleted records.
+The analytics response remains scoped to the academic term.
 
-Period dates are inclusive, must fit inside their parent, and cannot overlap
-other periods of that parent. Each period name occurs at most once per parent.
-`SemesterTerm.save()` calls `full_clean()`; parent `full_clean()` also prevents
-shrinking its calendar past existing children. A parent with children is
-protected from deletion. Bulk writes bypass model validation; date order and
-period uniqueness have database constraints, but containment and overlap checks
-are application validation and do not serialize concurrent writes.
-
-Migration `0004_semesterterm` adds only the child table and leaves existing
-academic terms intact. No grading periods are inferred from existing dates.
-Reversing it removes that table and its grading-period data; export those records
-first if a rollback is needed. The existing analytics response remains scoped
-to the parent semester.
+Migration `0006_academicyear_academicterm_academic_year_timeline` adds the year
+table and a nullable link on semesters without changing existing semester data.
+Existing semesters remain valid with no link. Configure the approved full-year
+dates explicitly, then link the relevant semesters; the migration does not infer
+year dates from a possibly incomplete semester calendar. Reversing `0006` removes
+year timelines and their links but preserves the original semester fields and
+records; export configured year timelines first if they need to be restored.
 
 Call `full_clean()` before saving terms in trusted backend management code.
 It checks effective-calendar overlaps while allowing intentional default /
@@ -186,7 +183,7 @@ profiles, terms, and fines through the models. For example, in a Django shell:
 from decimal import Decimal
 from datetime import date
 from accounts.models import UserProfile
-from library.models import AcademicTerm, LoanFine
+from library.models import AcademicYear, AcademicTerm, LoanFine
 
 profile = UserProfile.objects.get(id_number="ACTUAL-STUDENT-ID")
 profile.education_level = "college"
@@ -195,10 +192,24 @@ profile.full_clean()
 profile.save(update_fields=["education_level", "year_level"])
 
 # Example dates only: substitute the institution's actual approved calendar.
-term = AcademicTerm(academic_year="2026-2027", semester="1", education_level="college",
-                    start_date=date(2026, 9, 1), end_date=date(2027, 1, 31))
-term.full_clean()
-term.save()
+year = AcademicYear.objects.create(
+    academic_year="2026-2027", education_level="college",
+    start_date=date(2026, 8, 17), end_date=date(2027, 6, 1),
+)
+first_semester = AcademicTerm(
+    academic_year_timeline=year, academic_year=year.academic_year,
+    semester="1", education_level=year.education_level,
+    start_date=date(2026, 8, 17), end_date=date(2026, 12, 18),
+)
+first_semester.full_clean()
+first_semester.save()
+second_semester = AcademicTerm(
+    academic_year_timeline=year, academic_year=year.academic_year,
+    semester="2", education_level=year.education_level,
+    start_date=date(2027, 1, 11), end_date=date(2027, 6, 1),
+)
+second_semester.full_clean()
+second_semester.save()
 
 # Example charge only: use the actual librarian-assessed amount and loan ID.
 fine = LoanFine(loan_id=42, amount_assessed=Decimal("25.00"), amount_paid=Decimal("0.00"))
@@ -211,8 +222,8 @@ and row lock when updating the cumulative amount to avoid lost concurrent update
 
 ## Migrations and verification
 
-New migrations add the two profile fields, AcademicTerm, LoanFine, and a
-user/checkout-date index. No analytics snapshot table is needed: the dashboard
+Migrations add the two profile fields, AcademicTerm, AcademicYear, LoanFine,
+and a user/checkout-date index. No analytics snapshot table is needed: the dashboard
 aggregates loan records on demand.
 
 From `backend`, apply to the intended application database when ready:
