@@ -1,9 +1,9 @@
-import styles from "../../../../styles/adminPages/dashboard/heatmap.module.css"
+import styles from "../../../styles/components/graphs/heatmap.module.css"
 
 const startDate = new Date("8/17/2026");
 const endDate = new Date("12/19/2026");
 
-export default function Heatmap({ data }) {
+export default function Heatmap({ header, subHeader, data }) {
 
     const days = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -47,8 +47,8 @@ export default function Heatmap({ data }) {
     return (
         <div className={styles.container}>
             <div className={styles.header}>
-                <p>Peak Borrowing Periods</p>
-                <p className={styles.subHeader}>Checkouts by day and week of the term</p>
+                <p>{header}</p>
+                <p className={styles.subHeader}>{subHeader}</p>
             </div>
             <div className={styles.heatmapContainer}>
                 <div className={styles.heatmap}>

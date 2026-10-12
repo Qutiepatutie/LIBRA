@@ -1,20 +1,17 @@
-import styles from "../../../../styles/userPages/dashboard/graphcontainer.module.css"
+import styles from "../../../styles/components/graphs/graphcontainer.module.css"
 
 import {Chart as Chartjs, PointElement, LineElement, CategoryScale, LinearScale, Tooltip, Legend} from "chart.js"
 import { Line } from "react-chartjs-2"
 
-// import { lineData } from "./test.data";
-
-export default function LineGraph() {
-    
-    const data = [];
+export default function LineGraph({header, subHeader, data}) {
 
     Chartjs.register(CategoryScale, LinearScale, LineElement, PointElement, Tooltip, Legend);
 
     return (
         <div className={styles.container}>
             <div className={styles.header}>
-                <p>Borrowing Frequency</p>
+                <p>{header}</p>
+                <p className={styles.subHeader}>{subHeader}</p>
             </div>
             <div className={styles.graphContainer}>
                 <div className={styles.graph}>

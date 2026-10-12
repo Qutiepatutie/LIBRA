@@ -1,8 +1,9 @@
 import styles from "../../../styles/userPages/dashboard/statistics.module.css"
 
-import LineGraph from "./graphs/Line.jsx"
-import BarGraph from "./graphs/Bar.jsx"
 import Table from "./Table.jsx"
+
+import LineGraph from "../../../components/ui/graphs/Line.jsx"
+import BarGraph from "../../../components/ui/graphs/Bar.jsx"
 
 export default function UserStatistics() {
     return (
@@ -27,11 +28,18 @@ export default function UserStatistics() {
             </div>
 
             <div className={`${styles.panel} ${styles.doughnutGraphContainer}`}>
-                <LineGraph />
+                <LineGraph
+                    header={"My Borrowing Frequency"}
+                    data={[]}
+                />
             </div>
             
             <div className={`${styles.panel} ${styles.barGraphContainer}`}>
-                <BarGraph />
+                <BarGraph
+                    header={"Most Borrowed Subjects"}
+                    subHeader={"Based on your history"}
+                    data={[]}
+                />
             </div>
         
             <div className={`${styles.panel} ${styles.books}`}>
