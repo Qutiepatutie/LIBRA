@@ -1,0 +1,50 @@
+.header {
+    height: 10vh;
+    width: 100%;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    border-bottom: 2px solid var(--primary-color);
+
+    & > .selectors {
+        display: flex;
+
+        gap: 1em;
+
+        & > .selector {
+            width: 10vw;
+            height: 5em;
+        }
+    }
+    
+    & > .filters {
+        height: 2em;
+        display: flex;
+
+        border-radius: 5px;
+        overflow: hidden;
+        
+        background-color: #E8E9E2;
+        
+        & > .active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        & > button {
+            border: none;
+            padding: 0.5em 1em;
+            
+            background-color: #E8E9E2;
+
+            &:hover {
+                background-color: var(--primary-color);
+                color: white;
+                cursor: pointer;
+            }
+
+        }
+    }
+}

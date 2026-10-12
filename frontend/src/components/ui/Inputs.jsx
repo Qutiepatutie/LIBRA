@@ -41,11 +41,12 @@ export function DescriptionInput({ label="", value="", name="", rows="", onChang
     )
 }
 
-export function Selector({ placeholder="",value="", options, name="", label="", onChange, disabled, isEmpty=false}) {
+export function Selector({ placeholder="",value="", options, name="", label="", onChange, disabled, isEmpty=false, height}) {
     return (
         <div className={styles.selector}>
             {label && <label htmlFor={name}>{label}</label>}
             <select
+                style={{height: height}}
                 name={name}
                 onChange={onChange}
                 value={value}

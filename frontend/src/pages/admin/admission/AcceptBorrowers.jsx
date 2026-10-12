@@ -1,4 +1,4 @@
-import styles from "../../../styles/adminPages/dashboard/bookborrowers.module.css"
+import styles from "../../../styles/adminPages/admission/bookborrowers.module.css"
 
 import { useState } from "react";
 import { useBorrowers } from "../../../hooks/useBorrowers"

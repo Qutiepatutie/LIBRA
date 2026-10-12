@@ -1,4 +1,4 @@
-import styles from "../../styles/adminPages/dashboard/borrowerlist.module.css"
+import styles from "../../styles/adminPages/admission/borrowerlist.module.css"
 
 import BookPanel from "../library/BookPanel.jsx"
 import CustomButton from "../ui/CustomButton.jsx"
@@ -15,7 +15,7 @@ export default function BorrowerList({ borrowers, updateBookStatus, acceptBook, 
                             <BookPanel
                                 book={borrower.book}
                                 hover={false}
-                            />  
+                            />
                         </div>
                         <div className={styles.borrowerInfo}>
                             <p>{borrower.user.first_name} {borrower.user.last_name}</p>
@@ -24,7 +24,7 @@ export default function BorrowerList({ borrowers, updateBookStatus, acceptBook, 
                                 <p>Due: {borrower.due_date}</p>
                             }
                         </div>
-        
+
                         <div className={styles.buttons}>
                             {borrower.status === "Pending" &&
                                 <div className={styles.cancel}>
@@ -49,7 +49,7 @@ export default function BorrowerList({ borrowers, updateBookStatus, acceptBook, 
                                             acceptBook(borrower.book.isbn, borrower.book.call_number);
                                         }
                                     }}
-                                    
+
                                     action={loading ? "loading" : ""}
                                 />
                             </div>
