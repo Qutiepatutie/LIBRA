@@ -1,4 +1,4 @@
-import styles from "../../styles/adminPages/borrowers.module.css"
+import styles from "../../styles/adminPages/history.module.css"
 
 import { useState } from "react";
 

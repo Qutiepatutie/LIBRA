@@ -36,4 +36,8 @@
     & > .bar {
         min-height: 250px;
     }
+
+    & > .doughnut {
+        min-width: 60%;
+    }
 }
