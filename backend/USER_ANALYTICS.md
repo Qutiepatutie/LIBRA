@@ -102,7 +102,10 @@ checkouts as the denominator and are rounded to two decimals.
 `UserProfile.education_level` accepts `senior_high` or `college`.
 `year_level` is a string containing a positive integer, e.g. `"1"` for college
 freshman or `"11"` for Grade 11. Existing profiles migrate with these fields
-blank; do not infer a student's level from their program name.
+blank. New registrations get `education_level` from the chosen program
+(`accounts.models.education_level_for_program`): SHS strands (`STEM`, `GAS`,
+`HUMSS`, `ABM`) map to `senior_high`, `BS ...` / `Bachelor...` programs map to
+`college`, and anything else stays blank.
 
 `AcademicYear` stores the full year's label (for example `2026-2027`), education
 level, optional year-level scope, and inclusive `start_date` / `end_date`.

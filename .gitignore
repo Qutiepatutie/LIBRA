@@ -45,6 +45,7 @@ TEST_ANALYTICS.md
 SECURITY_NOTES.md
 seed_data.py
 test_analytics.py
+dashboard_admin.md
 analytics_user.md
 SUPABASE_SCHEMA.md
 API_ENDPOINTS.md
