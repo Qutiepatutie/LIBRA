@@ -70,7 +70,7 @@
         cursor: pointer;
 
         & > .icon {
-            width: 60%;
+            width: 50%;
             aspect-ratio: 1;
             object-fit: contain;
             user-select: none;
