@@ -1,5 +1,5 @@
 import { useState,useEffect } from "react";
-import { getBooks } from "../../../api/books";
+import { getBooks } from "../../api/books";
 import { categories } from "./library.constants";
 import { updateBook as updateBookUtil } from "./library.util";
 

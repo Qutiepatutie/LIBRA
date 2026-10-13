@@ -1,17 +1,17 @@
-import styles from "../../../styles/library/library.module.css"
+import styles from "../../styles/library/library.module.css"
 
 import { useState } from "react"
 
-import { SearchBar } from "../../../components/ui/Inputs.jsx"
+import { SearchBar } from "../../components/ui/Inputs.jsx"
 
-import CategoryPanel from "../../../components/library/CategoryPanel.jsx"
-import ExpandedCategory from "../../../components/library/ExpandedCategory.jsx"
-import ShowBook from "../../../components/library/showbook/ShowBook.jsx"
-import BookPanel from "../../../components/library/BookPanel.jsx"
+import CategoryPanel from "../../components/library/CategoryPanel.jsx"
+import ExpandedCategory from "../../components/library/ExpandedCategory.jsx"
+import ShowBook from "../../components/library/showbook/ShowBook.jsx"
+import BookPanel from "../../components/library/BookPanel.jsx"
 
 import { categories } from "./library.constants.js"
 import { useLibraryBooks } from "./useLibraryBooks.js"
-import { useBorrowers } from "../../../hooks/useBorrowers.js"
+import { useBorrowers } from "../../hooks/useBorrowers.js"
 
 export default function Library() {
 

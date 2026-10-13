@@ -25,7 +25,7 @@ export default function Sidebar() {
             <div className={styles.bottomNav}>
                 <div className={styles.buttons}>
                     <NavLink
-                        to = {role === "admin" ? "/admin/dashboard/statistics" : "/dashboard"}
+                        to = {role === "admin" ? "/admin/dashboard/circulation" : "/dashboard"}
                         className={`${styles.navButton} ${isDashboardActive ? styles.active : ""}`}
                     >
                         <img className={styles.icon} src={dashboard} />

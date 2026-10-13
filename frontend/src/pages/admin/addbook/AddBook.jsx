@@ -9,7 +9,7 @@ import {
     Selector
 } from "../../../components/ui/Inputs.jsx"
 import CustomButton from "../../../components/ui/CustomButton.jsx"
-import { categories } from "../../user/library/library.constants.js"
+import { categories } from "../../library/library.constants.js"
 import { 
     initialFormValues,
     initialFormErrors,

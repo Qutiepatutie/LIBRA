@@ -6,9 +6,10 @@ import ProtectedRoute from "./ProtectedRoute.jsx"
 import AdminRoute from "./AdminRoute.jsx"
 import AttendanceRoute from "./AttendanceRoute.jsx"
 
+import Library from "../pages/library/Library.jsx"
+
 import UserDashboard from "../pages/user/UserDashboard.jsx"
 import BorrowingHistory from "../pages/user/BorrowingHistory.jsx"
-import Library from "../pages/user/library/Library.jsx"
 import BorrowedBooks from "../pages/user/borrowedBooks/BorrowedBooks.jsx"
 
 import AdminDashboardLayout from "../layouts/AdminDashboardLayout.jsx"
