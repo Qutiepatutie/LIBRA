@@ -10,18 +10,21 @@ export default function Header({ setShowUserMenu, showUserMenu}) {
     const { pathname } = useLocation();
 
     const currPage = {
-        "/dashboard" : "Dashboard",
         "/library" : "Library",
         "/borrowed-books" : "Borrowed Books",
         "/discussion-room-reservation" : "Discussion Room Reservation",
 
-        "/admin/borrowers" : "Borrowers",
+        "/admin/history" : "History",
         "/admin/add-book" : "Add Book",
     }
 
     const getPageTitle = (path) => {
-        if (path.startsWith("/admin/dashboard")) {
+        if (path.includes("dashboard")) {
             return "Dashboard";
+        }
+
+        if (path.includes("admission")) {
+            return "Admission"
         }
 
         return currPage[path] || "";
