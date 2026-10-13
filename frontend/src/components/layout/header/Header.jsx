@@ -12,6 +12,7 @@ export default function Header({ setShowUserMenu, showUserMenu}) {
     const currPage = {
         "/library" : "Library",
         "/borrowed-books" : "Borrowed Books",
+        "/history" : "History",
         "/discussion-room-reservation" : "Discussion Room Reservation",
 
         "/admin/history" : "History",

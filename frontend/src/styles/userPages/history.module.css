@@ -1,15 +1,12 @@
 .container {
-    height: 100%;
-    width: 100%;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    grid-template-rows: 1fr 20vw 2fr;
+    grid-template-rows: 1fr 4fr;
     gap: clamp(0.3em, 1vw, 3em);
-    padding: 0.5em clamp(1em, 6vw, 10rem);
+    padding: clamp(1em, 6vh, 10rem) clamp(1em, 10vw, 16rem);
 
     grid-template-areas:
         "total overdue due fine"
-        "line line bar bar"
         "table table table table";
 
     overflow-x: auto;
@@ -55,21 +52,17 @@
     &:nth-child(2) { grid-area: overdue; }
     &:nth-child(3) { grid-area: due; }
     &:nth-child(4) { grid-area: fine; }
-    &:nth-child(5) { grid-area: line; aspect-ratio: 1;}
-    &:nth-child(6) { grid-area: bar; aspect-ratio: 1;}
-    &:nth-child(7) { grid-area: table; }
+    &:nth-child(5) { grid-area: table; }
 }
 
 @media (max-width: 600px) {
     .container {
         grid-template-columns: repeat(2, 1fr);
-        grid-template-rows: 1fr 1fr 2.5fr 2.5fr minmax(200px, 2fr);
+        grid-template-rows: 1fr 1fr 4fr;
 
         grid-template-areas:
         "total overdue"
         "due fine"
-        "line line"
-        "bar bar"
         "table table";
     }
 }

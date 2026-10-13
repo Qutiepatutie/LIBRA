@@ -1,6 +1,6 @@
-import styles from "../../../styles/userPages/dashboard/history.module.css"
+import styles from "../../styles/userPages/history.module.css"
 
-import Table from "../../../components/ui/dashboard/Table"
+import Table from "../../components/ui/dashboard/Table"
 
 export default function BorrowingHistory() {
     return (

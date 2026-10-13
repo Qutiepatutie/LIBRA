@@ -5,6 +5,7 @@ import { NavLink, useLocation } from "react-router-dom"
 import dashboard from "../../assets/sidebar/dashboard.svg"
 import library from "../../assets/sidebar/library.svg"
 import borrowedBooks from "../../assets/sidebar/borrowedBooks.svg"
+import history from "../../assets/sidebar/history.svg"
 import addBook from "../../assets/sidebar/addbook-icon.svg"
 
 import { getStorage } from "../../pages/auth/auth.util.js"
@@ -24,7 +25,7 @@ export default function Sidebar() {
             <div className={styles.bottomNav}>
                 <div className={styles.buttons}>
                     <NavLink
-                        to = {role === "admin" ? "/admin/dashboard/statistics" : "/dashboard/statistics"}
+                        to = {role === "admin" ? "/admin/dashboard/statistics" : "/dashboard"}
                         className={`${styles.navButton} ${isDashboardActive ? styles.active : ""}`}
                     >
                         <img className={styles.icon} src={dashboard} />
@@ -42,6 +43,13 @@ export default function Sidebar() {
                         className={({ isActive }) => `${styles.navButton} ${isActive ? styles.active : ""}`}
                     >
                         <img className={styles.icon} src={borrowedBooks} />
+                    </NavLink>
+                    
+                    <NavLink
+                        to = "/history"
+                        className={({ isActive }) => `${styles.navButton} ${isActive ? styles.active : ""}`}
+                    >
+                        <img className={styles.icon} src={history} />
                     </NavLink>
                     
                     {role === "admin" &&

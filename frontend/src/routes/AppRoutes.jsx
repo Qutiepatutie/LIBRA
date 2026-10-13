@@ -6,9 +6,8 @@ import ProtectedRoute from "./ProtectedRoute.jsx"
 import AdminRoute from "./AdminRoute.jsx"
 import AttendanceRoute from "./AttendanceRoute.jsx"
 
-import UserDashboardLayout from "../layouts/UserDashboardLayout.jsx"
-import UserStatistics from "../pages/user/dashboard/UserStatistics.jsx"
-import BorrowingHistory from "../pages/user/dashboard/BorrowingHistory.jsx"
+import UserDashboard from "../pages/user/UserDashboard.jsx"
+import BorrowingHistory from "../pages/user/BorrowingHistory.jsx"
 import Library from "../pages/user/library/Library.jsx"
 import BorrowedBooks from "../pages/user/borrowedBooks/BorrowedBooks.jsx"
 
@@ -36,27 +35,25 @@ export default function AppRoutes() {
                <Route path="/attendance" element = {<Attendance />} />
           </Route>
           <Route element= {<MainLayout />}>
-                <Route path="/dashboard" element={<UserDashboardLayout />}>
-                    <Route path="statistics" element={<UserStatistics/>} />
-                    <Route path="history" element={<BorrowingHistory/>} />
+            <Route path="/dashboard" element={<UserDashboard/>} />
+            <Route path="/history" element={<BorrowingHistory/>} />
+            <Route path="/library" element = {<Library />} />
+            <Route path="/borrowed-books" element = {<BorrowedBooks />} />
+            <Route path="/discussion-room-reservation" element = {<DiscussionRoom />} />
+            
+            <Route  element = {<AdminRoute />} >
+                <Route path ="/admin/dashboard" element={<AdminDashboardLayout />}>
+                    <Route path="circulation" element= {<Circulation />} />
+                    <Route path="borrowers" element= {<Borrowers />} />
+                    <Route path="inventory" element= {<Inventory />} />
                 </Route>
-               <Route path="/library" element = {<Library />} />
-               <Route path="/borrowed-books" element = {<BorrowedBooks />} />
-               <Route path="/discussion-room-reservation" element = {<DiscussionRoom />} />
-
-               <Route  element = {<AdminRoute />} >
-                    <Route path ="/admin/dashboard" element={<AdminDashboardLayout />}>
-                        <Route path="circulation" element= {<Circulation />} />
-                        <Route path="borrowers" element= {<Borrowers />} />
-                        <Route path="inventory" element= {<Inventory />} />
+                    <Route path="/admin/admission" element={<AdminAdmissionLayout />}>
+                        <Route path="borrowers" element= {<AcceptBorrowers />} />
+                        <Route path="return-books" element= {<ReturnBooks />} />
                     </Route>
-                      <Route path="/admin/admission" element={<AdminAdmissionLayout />}>
-                          <Route path="borrowers" element= {<AcceptBorrowers />} />
-                          <Route path="return-books" element= {<ReturnBooks />} />
-                      </Route>
-                    <Route path="/admin/history" element = {<History />} />
-                    <Route path="/admin/add-book" element = {<AddBook />} />
-               </Route>
+                <Route path="/admin/history" element = {<History />} />
+                <Route path="/admin/add-book" element = {<AddBook />} />
+            </Route>
           </Route>    
         </Route>
     </Routes>

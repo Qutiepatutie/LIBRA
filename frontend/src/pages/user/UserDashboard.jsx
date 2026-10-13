@@ -1,11 +1,11 @@
-import styles from "../../../styles/userPages/dashboard/statistics.module.css"
+import styles from "../../styles/userPages/userdashboard.module.css"
 
-import Table from "../../../components/ui/dashboard/Table.jsx"
+import Table from "../../components/ui/dashboard/Table.jsx"
 
-import LineGraph from "../../../components/ui/dashboard/graphs/Line.jsx"
-import BarGraph from "../../../components/ui/dashboard/graphs/Bar.jsx"
+import LineGraph from "../../components/ui/dashboard/graphs/Line.jsx"
+import BarGraph from "../../components/ui/dashboard/graphs/Bar.jsx"
 
-export default function UserStatistics() {
+export default function UserDashboard() {
     return (
         <div className={styles.container}>
             <div className={styles.panel}>
