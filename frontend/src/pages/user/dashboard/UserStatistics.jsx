@@ -1,9 +1,9 @@
 import styles from "../../../styles/userPages/dashboard/statistics.module.css"
 
-import Table from "./Table.jsx"
+import Table from "../../../components/ui/dashboard/Table.jsx"
 
-import LineGraph from "../../../components/ui/graphs/Line.jsx"
-import BarGraph from "../../../components/ui/graphs/Bar.jsx"
+import LineGraph from "../../../components/ui/dashboard/graphs/Line.jsx"
+import BarGraph from "../../../components/ui/dashboard/graphs/Bar.jsx"
 
 export default function UserStatistics() {
     return (

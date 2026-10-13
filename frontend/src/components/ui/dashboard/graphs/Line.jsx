@@ -1,4 +1,4 @@
-import styles from "../../../styles/components/graphs/graphcontainer.module.css"
+import styles from "../../../../styles/components/dashboards/graphs/graphcontainer.module.css"
 
 import {Chart as Chartjs, PointElement, LineElement, CategoryScale, LinearScale, Tooltip, Legend} from "chart.js"
 import { Line } from "react-chartjs-2"

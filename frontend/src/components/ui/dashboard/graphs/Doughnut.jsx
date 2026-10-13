@@ -1,4 +1,4 @@
-import styles from "../../../styles/components/graphs/graphcontainer.module.css"
+import styles from "../../../../styles/components/dashboards/graphs/graphcontainer.module.css"
 
 import {Chart as Chartjs, DoughnutController, ArcElement, Tooltip, Legend} from "chart.js"
 import { Doughnut } from "react-chartjs-2"

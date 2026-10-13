@@ -12,3 +12,10 @@ export const historyTable = [
     "Date Returned",
     "Fee Paid",
 ]
+
+export const inventoryTable = [
+    "Borrower",
+    "Title",
+    "Due",
+    "Days Overdue"
+]

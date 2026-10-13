@@ -2,9 +2,9 @@ import styles from "../../../styles/adminPages/dashboard/circulation.module.css"
 
 import Header from "./DashboardHeader"
 
-import Bar from "../../../components/ui/graphs/Bar.jsx"
-import Line from "../../../components/ui/graphs/Line.jsx"
-import Heatmap from "../../../components/ui/graphs/Heatmap.jsx"
+import BarGraph from "../../../components/ui/dashboard/graphs/Bar.jsx"
+import LineGraph from "../../../components/ui/dashboard/graphs/Line.jsx"
+import Heatmap from "../../../components/ui/dashboard/graphs/Heatmap.jsx"
 
 export default function Circulation() {
     
@@ -32,7 +32,7 @@ export default function Circulation() {
                 </div>
 
                 <div className={styles.panel}>
-                    <Line
+                    <LineGraph
                         header={"Total Checkouts"}
                         subHeader={"By day of week"}
                         data={[]}
@@ -40,7 +40,7 @@ export default function Circulation() {
                 </div>
 
                 <div className={styles.panel}>
-                    <Bar
+                    <BarGraph
                         header={"Top 10 most borrowed books"}
                         subHeader={"Ranked by checkouts"}
                         data={[]}

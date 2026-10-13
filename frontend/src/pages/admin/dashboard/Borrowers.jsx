@@ -2,9 +2,9 @@ import styles from "../../../styles/adminPages/dashboard/borrowers.module.css"
 
 import Header from "./DashboardHeader"
 
-import Line from "../../../components/ui/graphs/Line.jsx"
-import Bar from "../../../components/ui/graphs/Bar.jsx"
-import Doughnut from "../../../components/ui/graphs/Doughnut.jsx"
+import LineGraph from "../../../components/ui/dashboard/graphs/Line.jsx"
+import BarGraph from "../../../components/ui/dashboard/graphs/Bar.jsx"
+import DoughnutGraph from "../../../components/ui/dashboard/graphs/Doughnut.jsx"
 
 export default function Borrowers() {
     return (
@@ -36,7 +36,7 @@ export default function Borrowers() {
                 </div>
                 
                 <div className={styles.panel}>
-                    <Bar
+                    <BarGraph
                         header={"Top 10 most borrowed books"}
                         subHeader={"Ranked by checkouts"}
                         data={[]}
@@ -44,7 +44,7 @@ export default function Borrowers() {
                 </div>
 
                 <div className={styles.panel}>
-                    <Doughnut
+                    <DoughnutGraph
                         header={"Active vs Inactive users"}
                             subHeader={"Inactive means no checkouts in the selected semester"}
                         data={[]}
@@ -52,7 +52,7 @@ export default function Borrowers() {
                 </div>
                 
                 <div className={styles.panel}>
-                    <Line
+                    <LineGraph
                         header={"Borrowing frequency overtime"}
                         subHeader={"By hour of day"}
                         data={[]}

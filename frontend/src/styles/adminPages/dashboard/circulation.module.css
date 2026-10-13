@@ -15,7 +15,7 @@
     padding: 0.5em clamp(1em, 6vw, 10rem);
 
     grid-template-areas:
-        "total overdue due fine"
+        "header1 header2 header3 header4"
         "line line line line"
         "bar bar bar bar"
         "heatmap heatmap heatmap heatmap";
@@ -49,10 +49,10 @@
         font-size: clamp(0.8em, 1vw, 3em);
     }
 
-    &:nth-child(1) { grid-area: total; }
-    &:nth-child(2) { grid-area: overdue; }
-    &:nth-child(3) { grid-area: due; }
-    &:nth-child(4) { grid-area: fine; }
+    &:nth-child(1) { grid-area: header1; }
+    &:nth-child(2) { grid-area: header2; }
+    &:nth-child(3) { grid-area: header3; }
+    &:nth-child(4) { grid-area: header4; }
     &:nth-child(5) { grid-area: line; aspect-ratio: 1;}
     &:nth-child(6) { grid-area: bar; aspect-ratio: 1;}
     &:nth-child(7) { grid-area: heatmap;}
@@ -64,8 +64,8 @@
         grid-template-rows: 1fr 1fr 2.5fr 2.5fr minmax(200px, 2fr);
 
         grid-template-areas:
-        "total overdue"
-        "due fine"
+        "header1 header2"
+        "header3 header4"
         "line line"
         "bar bar"
         "heatmap heatmap";

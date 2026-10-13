@@ -1,4 +1,4 @@
-import styles from "../../../styles/components/graphs/heatmap.module.css"
+import styles from "../../../../styles/components/dashboards/graphs/heatmap.module.css"
 
 const startDate = new Date("8/17/2026");
 const endDate = new Date("12/19/2026");
