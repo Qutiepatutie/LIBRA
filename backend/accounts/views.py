@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from .models import UserLogin
-from .models import UserProfile
+from .models import UserProfile, education_level_for_program
 
 from .serializers import UserLoginSerializer
 
@@ -70,6 +70,7 @@ def register_user(request):
         sex = sex,
         id_number = id_number,
         program = program,
+        education_level = education_level_for_program(program),
     )
 
     return Response({"message": "Registered Successfully"}, status=status.HTTP_201_CREATED)

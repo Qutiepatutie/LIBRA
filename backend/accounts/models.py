@@ -9,6 +9,19 @@ class EducationLevel(models.TextChoices):
     COLLEGE = 'college', 'College'
 
 
+SHS_STRANDS = {'STEM', 'GAS', 'HUMSS', 'ABM'}
+
+
+def education_level_for_program(program):
+    # Unknown programs stay blank rather than guessing a cohort.
+    program = (program or '').strip()
+    if program in SHS_STRANDS:
+        return EducationLevel.SENIOR_HIGH
+    if program.startswith(('BS ', 'Bachelor')):
+        return EducationLevel.COLLEGE
+    return ''
+
+
 year_level_validator = RegexValidator(r'^[1-9][0-9]*$', 'Use a numeric year or grade level, e.g. 1 or 11.')
 
 #Manages users
