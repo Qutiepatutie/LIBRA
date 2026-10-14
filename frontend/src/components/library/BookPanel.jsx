@@ -21,9 +21,11 @@ export default function BookPanel({ setActiveBook, setShowBook, status = null, b
                         <img src={info} className={styles.icon} />
                     </div>
                 }
+                <div className={styles.info}>
+                    <p className={styles.title}>{book?.title}</p>
+                    <p className={styles.author}>by {book?.author}</p>
+                </div>
             </div>
-            <p className={styles.title}>{book?.title}</p>
-            <p className={styles.author}>{book?.author}</p>
         </div>
     )
 }
