@@ -80,11 +80,11 @@ export default function Sidebar() {
                             </NavLink>
                             
                             <NavLink
-                                to="/discussion-room-reservation"
+                                to="/room-reservation"
                                 className={({ isActive }) => `${styles.navButton} ${isActive ? styles.active : ""}`}
                             >
                                 <img className={styles.icon} src={discussionRoom} />
-                                <p className={styles.tooltip}>Discussion Room Reservation</p>
+                                <p className={styles.tooltip}>Room Reservation</p>
                             </NavLink>
                         </>
                     )}

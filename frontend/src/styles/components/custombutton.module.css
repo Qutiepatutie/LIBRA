@@ -26,12 +26,12 @@
 }
 
 .return,
-.cancel {
-    background-color: #E8E9E2;
-    color: #2F312D;
+.clear {
+    background-color: lightgray;
+    color: black;
 }
 
-.clear {
+.cancel {
     background-color: #BA1A1A;
 }
 

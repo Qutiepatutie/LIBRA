@@ -11,6 +11,7 @@ import Library from "../pages/library/Library.jsx"
 import UserDashboard from "../pages/user/UserDashboard.jsx"
 import BorrowingHistory from "../pages/user/BorrowingHistory.jsx"
 import BorrowedBooks from "../pages/user/borrowedBooks/BorrowedBooks.jsx"
+import RoomReservation from "../pages/user/roomReservation/RoomReservation.jsx"
 
 import AdminDashboardLayout from "../layouts/AdminDashboardLayout.jsx"
 import AdminAdmissionLayout from "../layouts/AdminAdmissionLayout.jsx"
@@ -19,7 +20,6 @@ import Borrowers from "../pages/admin/dashboard/Borrowers.jsx"
 import Inventory from "../pages/admin/dashboard/Inventory.jsx"
 import History from "../pages/admin/History.jsx"
 import AddBook from "../pages/admin/addbook/AddBook.jsx"
-import DiscussionRoom from "../pages/user/DiscussionRoom.jsx"
 import AcceptBorrowers from "../pages/admin/admission/AcceptBorrowers.jsx"
 import ReturnBooks from "../pages/admin/admission/ReturnBooks.jsx"
 
@@ -40,7 +40,7 @@ export default function AppRoutes() {
             <Route path="/history" element={<BorrowingHistory/>} />
             <Route path="/library" element = {<Library />} />
             <Route path="/borrowed-books" element = {<BorrowedBooks />} />
-            <Route path="/discussion-room-reservation" element = {<DiscussionRoom />} />
+            <Route path="/room-reservation" element={<RoomReservation />} />
             
             <Route  element = {<AdminRoute />} >
                 <Route path ="/admin/dashboard" element={<AdminDashboardLayout />}>

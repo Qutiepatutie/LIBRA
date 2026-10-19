@@ -39,4 +39,8 @@
 *{
     margin: 0;
     box-sizing: border-box;
+    
+    &:focus-visible {
+        outline: 2px solid rgba(93,109,79);
+    }
 }

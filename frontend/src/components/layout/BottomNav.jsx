@@ -7,6 +7,7 @@ import library from "../../assets/sidebar/library.svg"
 import borrowedBooks from "../../assets/sidebar/borrowedBooks.svg"
 import history from "../../assets/sidebar/history.svg"
 import addBook from "../../assets/sidebar/addbook-icon.svg"
+import discussionRoom from "../../assets/sidebar/discussion-room.svg"
 
 import { getStorage } from "../../pages/auth/auth.util.js"
 
@@ -50,6 +51,13 @@ export default function Sidebar() {
                         className={({ isActive }) => `${styles.navButton} ${isActive ? styles.active : ""}`}
                     >
                         <img className={styles.icon} src={history} />
+                    </NavLink>
+                    
+                    <NavLink
+                        to="/room-reservation"
+                        className={({ isActive }) => `${styles.navButton} ${isActive ? styles.active : ""}`}
+                    >
+                        <img className={styles.icon} src={discussionRoom} />
                     </NavLink>
                     
                     {role === "admin" &&

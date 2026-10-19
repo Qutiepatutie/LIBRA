@@ -1,0 +1,158 @@
+.roomReservation {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    padding: clamp(2em, 5vw, 5em);
+
+    gap: clamp(1em, 2vw, 2.5em);
+
+    overflow-y: scroll;
+}
+
+.container {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 1.5fr 2fr;
+    grid-template-rows: auto 4fr;
+
+    grid-template-areas: 
+    "header header"
+    "timetable form";
+
+    padding: clamp(1em, 2.5vw, 2.5em) clamp(1.5em, 4vw, 4em);
+    margin-block: auto;
+    
+    row-gap: 2em;
+    column-gap: 5em;
+
+    border-radius: 10px;
+
+    background-color: #E8E9E2;
+    
+    & > .header {
+        grid-area: header;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        font-size: clamp(1em, 2vw, 2.5em);
+        text-align: center;
+    }
+}
+
+.timeTableContainer {
+    grid-area: timetable;
+    gap: 1em;
+
+    display: flex;
+    flex-direction: column;
+
+    border-radius: 15px;
+
+    & > .text {
+        font-size: clamp(0.6em, 0.7vw, 1em);
+    }
+    
+    & > .slot{
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: repeat(7, minmax(1em, auto));
+        grid-auto-flow: column;
+
+        gap: clamp(0.4em, 1vw, 1em);
+
+        & > .timeButton {
+            height: clamp(2.5em, 2.5vw, 3em);
+            border: 2px solid rgba(0,0,0,0.2);
+            border-radius: clamp(5px, 1.5vw, 10px);
+
+            font-size: clamp(0.7em, 0.9vw, 0.95em);
+
+            font-weight: 600;
+
+            background-color: transparent;
+            
+            &:disabled:is(.reserved) {
+                text-decoration: line-through;
+            }
+
+            &.active {
+                background-color: var(--primary-color);
+                color: white;
+            }
+
+        }
+    }
+        
+    & > .buttons {
+        display: flex;
+        gap: 1em;
+        
+        & > .selector {
+            flex: 1;
+            height: clamp(1.5em, 2vw, 2.5em);
+            
+            border: none;
+            border-radius: clamp(5px, 1vw, 10px);
+            background-color: lightgray;
+            
+            color: black;
+            font-size: clamp(1em, 1.2vw, 1.5em);
+        }
+    }
+}
+
+.formContainer {
+    grid-area: form;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 4fr 1fr;
+
+    gap: 1em;
+
+    & > .form{
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: repeat(4, minmax(1em, auto));
+        grid-auto-flow: column;
+        gap: 1.5em;
+        align-content: start;
+
+        & > .input {
+            min-width: 0;
+        }
+    }
+
+    & > .buttons {
+        display: flex;
+        align-items: end;
+        justify-content: flex-end;
+        gap: 1em;
+
+        & > .button {
+            height: clamp(1.5em, 2vw, 2.5em);
+            width: clamp(5em, 10vw, 10em);
+        }
+    }
+}
+
+@media (hover: hover) {
+    .timeButton:not(:disabled):hover,
+    .buttons > button:hover {
+        cursor: pointer;
+        transform: scale(1.02);
+    }
+}
+
+@media (max-width: 768px) {
+    .roomReservation > .container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr 1fr;
+    
+        grid-template-areas: 
+        "header"
+        "timetable"
+        "form";
+    }
+}

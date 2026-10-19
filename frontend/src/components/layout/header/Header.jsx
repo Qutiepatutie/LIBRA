@@ -13,7 +13,6 @@ export default function Header({ setShowUserMenu, showUserMenu}) {
         "/library" : "Library",
         "/borrowed-books" : "Borrowed Books",
         "/history" : "History",
-        "/discussion-room-reservation" : "Discussion Room Reservation",
 
         "/admin/history" : "History",
         "/admin/add-book" : "Add Book",
@@ -26,6 +25,10 @@ export default function Header({ setShowUserMenu, showUserMenu}) {
 
         if (path.includes("admission")) {
             return "Admission"
+        }
+
+        if (path.includes("room-reservation")) {
+            return "Room Reservation"
         }
 
         return currPage[path] || "";
