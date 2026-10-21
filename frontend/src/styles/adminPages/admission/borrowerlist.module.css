@@ -1,4 +1,4 @@
-.carousel {
+.list {
     position: relative;
     height: 100%;
     width: 100%;
@@ -38,55 +38,20 @@
     border-radius: 10px;
     border: 1px solid black;
 
-    & > .bookContainer {
+    & > .itemContainer {
         display: flex;
+        flex-direction: column;
+        align-items: center;
         justify-content: center;
 
-        padding-bottom: 0.5em;
-
-        border-bottom: 2px solid var(--primary-color);
-    }
-
-    & > .borrowerInfo p {
-        font-size: 0.9em;
-        
-        overflow: hidden;
-        white-space:nowrap;
-        text-overflow: ellipsis;
-    }
-
-    & > .buttons {
-        height: 2em;
-        display: flex;
-        justify-content: space-between;
         gap: 0.5em;
 
-        & > .cancel {
-            width: 2em;
-            aspect-ratio: 1;
+        & > .room {
+            width: 100%;
+            text-align: center;
+            font-size: 1.2em;
+            
         }
-
-        & > .accept {
-            flex: 1;
-        }
-    }
-}
-
-.panel {
-    width: 12em;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5em;
-    padding: 0.5em;
-    
-    border-radius: 10px;
-    border: 1px solid black;
-
-    & > .bookContainer {
-        display: flex;
-        justify-content: center;
-
-        border-bottom: 2px solid var(--primary-color);
     }
 
     & > .borrowerInfo p {

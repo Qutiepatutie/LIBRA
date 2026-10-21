@@ -1,20 +1,19 @@
-import styles from "../../../styles/adminPages/admission/returnbooks.module.css"
+import styles from "../../../styles/adminPages/admission/borrowers.module.css"
+
+import RoomReservationList from "../../../components/adminAdmission/RoomReservationList.jsx"
 
 import { useState } from "react";
+import { SearchBar } from "../../../components/ui/Inputs";
 import { useBorrowers } from "../../../hooks/useBorrowers";
 
-import { SearchBar } from "../../../components/ui/Inputs";
-import BorrowerList from "../../../components/adminDashboard/BorrowerList.jsx"
+import Toast from "../../../components/ui/Toast";
 
-import Toast from "../../../components/ui/Toast.jsx"
-
-export default function Inventory() {
+export default function RoomReservations() {
     const [currentQuery, setCurrentQuery] = useState("");
     
     const {
         currentBorrowers,
         loading,
-        updateBookStatus,
         searchBorrowers,
         toastMessage,
         showToast,
@@ -27,7 +26,7 @@ export default function Inventory() {
     return (
         <>
             <Toast message={toastMessage} show={showToast} />
-            <div className={styles.returnBooks}>
+            <div className={styles.bookBorrowers}>
                 <div className={styles.carouselHeader}>
                     <SearchBar 
                         placeholder="Search by name or ID number"
@@ -42,12 +41,9 @@ export default function Inventory() {
                         `
                     }
                 >
-                    <BorrowerList
-                        borrowers={displayedCurrent}
-                        updateBookStatus={updateBookStatus}
-                        loading={loading}
-                        category={"Current"}
-                    />
+                    <RoomReservationList
+                        borrowers={[]}
+                    /> 
                 </div>
             </div>
         </>

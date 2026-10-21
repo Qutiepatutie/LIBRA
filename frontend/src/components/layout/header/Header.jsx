@@ -14,7 +14,6 @@ export default function Header({ setShowUserMenu, showUserMenu}) {
         "/borrowed-books" : "Borrowed Books",
         "/history" : "History",
 
-        "/admin/history" : "History",
         "/admin/add-book" : "Add Book",
     }
 
@@ -24,7 +23,11 @@ export default function Header({ setShowUserMenu, showUserMenu}) {
         }
 
         if (path.includes("admission")) {
-            return "Admission"
+            return "Admission";
+        }
+        
+        if (path.includes("history")) {
+            return "History";
         }
 
         if (path.includes("room-reservation")) {

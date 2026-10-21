@@ -13,15 +13,14 @@ import BorrowingHistory from "../pages/user/BorrowingHistory.jsx"
 import BorrowedBooks from "../pages/user/borrowedBooks/BorrowedBooks.jsx"
 import RoomReservation from "../pages/user/roomReservation/RoomReservation.jsx"
 
-import AdminDashboardLayout from "../layouts/AdminDashboardLayout.jsx"
-import AdminAdmissionLayout from "../layouts/AdminAdmissionLayout.jsx"
+import AdminLayout from "../layouts/AdminLayout.jsx"
 import Circulation from "../pages/admin/dashboard/Circulation.jsx"
 import Borrowers from "../pages/admin/dashboard/Borrowers.jsx"
 import Inventory from "../pages/admin/dashboard/Inventory.jsx"
-import History from "../pages/admin/History.jsx"
+import History from "../pages/admin/history/History.jsx"
 import AddBook from "../pages/admin/addbook/AddBook.jsx"
-import AcceptBorrowers from "../pages/admin/admission/AcceptBorrowers.jsx"
-import ReturnBooks from "../pages/admin/admission/ReturnBooks.jsx"
+import AdminBorrowers from "../pages/admin/admission/AdminBorrowers.jsx"
+import RoomReservations from "../pages/admin/admission/RoomReservations.jsx"
 
 import Attendance from "../pages/attendance/Attendance.jsx"
 
@@ -43,16 +42,22 @@ export default function AppRoutes() {
             <Route path="/room-reservation" element={<RoomReservation />} />
             
             <Route  element = {<AdminRoute />} >
-                <Route path ="/admin/dashboard" element={<AdminDashboardLayout />}>
+                <Route path ="/admin/dashboard" element={<AdminLayout />}>
                     <Route path="circulation" element= {<Circulation />} />
                     <Route path="borrowers" element= {<Borrowers />} />
                     <Route path="inventory" element= {<Inventory />} />
                 </Route>
-                    <Route path="/admin/admission" element={<AdminAdmissionLayout />}>
-                        <Route path="borrowers" element= {<AcceptBorrowers />} />
-                        <Route path="return-books" element= {<ReturnBooks />} />
-                    </Route>
-                <Route path="/admin/history" element = {<History />} />
+                
+                <Route path="/admin/admission" element={<AdminLayout />}>
+                    <Route path="borrowers" element= {<AdminBorrowers />} />
+                    <Route path="return-books" element= {<AdminBorrowers />} />
+                    <Route path="reserve-rooms" element= {<RoomReservations />} />
+                </Route>
+                
+                <Route path="/admin/history" element={<AdminLayout />}>
+                    <Route path="books" element= {<History />} />
+                    <Route path="rooms" element= {<History />} />
+                </Route>
                 <Route path="/admin/add-book" element = {<AddBook />} />
             </Route>
           </Route>    

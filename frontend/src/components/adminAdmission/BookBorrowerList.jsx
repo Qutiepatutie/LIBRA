@@ -3,15 +3,15 @@ import styles from "../../styles/adminPages/admission/borrowerlist.module.css"
 import BookPanel from "../library/BookPanel.jsx"
 import CustomButton from "../ui/CustomButton.jsx"
 
-export default function BorrowerList({ borrowers, updateBookStatus, acceptBook, loading, category }) {
+export default function BookBorrowerList({ borrowers, updateBookStatus, acceptBook, loading, category }) {
 
     return (
-        <div className={styles.carousel} >
+        <div className={styles.list} >
             {borrowers.length === 0
                 ? <p className={styles.noBorrowers}>No {category} Borrowers</p>
                 : borrowers.map((borrower, index) => (
                     <div key={index} className={styles.panel}>
-                        <div className={styles.bookContainer}>
+                        <div className={styles.itemContainer}>
                             <BookPanel
                                 book={borrower.book}
                                 hover={false}
