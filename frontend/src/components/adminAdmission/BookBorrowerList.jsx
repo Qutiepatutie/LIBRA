@@ -3,7 +3,7 @@ import styles from "../../styles/adminPages/admission/borrowerlist.module.css"
 import BookPanel from "../library/BookPanel.jsx"
 import CustomButton from "../ui/CustomButton.jsx"
 
-export default function BookBorrowerList({ borrowers, updateBookStatus, acceptBook, loading, category }) {
+export default function BookBorrowerList({ borrowers, returnBook, cancelBook, acceptBook, loading, category }) {
 
     return (
         <div className={styles.list} >
@@ -31,7 +31,7 @@ export default function BookBorrowerList({ borrowers, updateBookStatus, acceptBo
                                     <CustomButton
                                         value="X"
                                         action="clear"
-                                        onClick={() => updateBookStatus(borrower.book.isbn, borrower.book.call_number, "cancel")}
+                                        onClick={() => cancelBook(borrower.book.isbn, borrower.book.call_number)}
                                         disabled={loading}
                                     />
                                 </div>
@@ -44,7 +44,7 @@ export default function BookBorrowerList({ borrowers, updateBookStatus, acceptBo
                                     }
                                     onClick={() => {
                                         if(borrower.status !== "Pending") {
-                                            updateBookStatus(borrower.book.isbn, borrower.book.call_number, "return");
+                                            returnBook(borrower.book.isbn, borrower.book.call_number);
                                         } else {
                                             acceptBook(borrower.book.isbn, borrower.book.call_number);
                                         }

@@ -82,14 +82,31 @@ export async function acceptBorrowedBook(isbn, call_num) {
     }
 }
 
-export async function returnBook(isbn, call_num, action) {
+export async function returnBook(isbn, call_num) {
     try {
         const resp = await authFetch(`${API_URL}/returnBook/` , {
           method: 'PUT',
           headers: {
             'Content-Type':'application/json',
           },
-          body: JSON.stringify({isbn, call_num, action})
+          body: JSON.stringify({isbn, call_num})
+        });
+
+        return await returnData(resp);
+    
+    } catch {
+        return ({"status": 500, "message":"Connection to Server Failed"});
+    }
+}
+
+export async function cancelBorrowedBook(isbn, call_num) {
+    try {
+        const resp = await authFetch(`${API_URL}/cancelBorrowedBook/` , {
+          method: 'PUT',
+          headers: {
+            'Content-Type':'application/json',
+          },
+          body: JSON.stringify({isbn, call_num})
         });
 
         return await returnData(resp);

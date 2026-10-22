@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 
-import { getAllBorrowers,acceptBorrowedBook, returnBook as returnBookUtil } from "../api/books";
+import { getAllBorrowers, acceptBorrowedBook, returnBook as returnBookUtil, cancelBorrowedBook} from "../api/books";
 import { getBookStatus } from "../utils/getBookStatus";
 
 export function useBorrowers() {
@@ -51,9 +51,9 @@ export function useBorrowers() {
         });
     }
 
-    async function updateBookStatus(isbn, call_num, action) {
+    async function returnBook(isbn, call_num) {
         setLoading(true);
-        const resp = await returnBookUtil(isbn, call_num, action);
+        const resp = await returnBookUtil(isbn, call_num);
         setLoading(false);
             
         showToastFunc(resp.message);
@@ -63,7 +63,20 @@ export function useBorrowers() {
         setAllBorrowers(borrowers => 
             borrowers.filter(b => b.book.isbn !== isbn)
         );
+    }
+    
+    async function cancelBook(isbn, call_num) {
+        setLoading(true);
+        const resp = await cancelBorrowedBook(isbn, call_num);
+        setLoading(false);
+            
+        showToastFunc(resp.message);
 
+        if(resp.status === "failed") { return; }
+
+        setAllBorrowers(borrowers => 
+            borrowers.filter(b => b.book.isbn !== isbn)
+        );
     }
 
     async function acceptBook(isbn, call_num) {
@@ -100,5 +113,17 @@ export function useBorrowers() {
             .includes(query)
         );
 
-    return { toastMessage, showToast, loading, pendingBorrowers, currentBorrowers, allBorrowers, setAllBorrowers, updateBookStatus, acceptBook, searchBorrowers };
+    return {
+        toastMessage,
+        showToast,
+        loading,
+        pendingBorrowers,
+        currentBorrowers,
+        allBorrowers,
+        setAllBorrowers,
+        returnBook,
+        acceptBook,
+        cancelBook,
+        searchBorrowers
+    };
 }

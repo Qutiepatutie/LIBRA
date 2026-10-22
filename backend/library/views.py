@@ -225,27 +225,43 @@ def accept_borrowed_book(request):
 def return_book(request):
     isbn = request.data.get("isbn")
     call_num = request.data.get("call_num")
-    action = request.data.get("action")
 
-    if action not in ("return", "cancel"):
-        return Response({"message": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
-
-    book = BorrowRecords.objects.filter(book__isbn=isbn, book__call_number=call_num, return_date__isnull=True).first()
+    book = BorrowRecords.objects.filter(
+        book__isbn=isbn,
+        book__call_number=call_num,
+        return_date__isnull=True
+    ).first()
+    
     if not book:
         return Response({"message": "No active book found"}, status=status.HTTP_404_NOT_FOUND)
 
-    book.status = (
-        StatusChoices.RETURNED
-        if action == "return"
-        else StatusChoices.CANCELLED
-    )
+    book.status = StatusChoices.RETURNED
 
     book.return_date = user_analytics.library_today()
     book.save()
 
-    actionReturn = "cancelled" if action == "cancel" else "returned"
+    return Response({"message": "Book returned successfully"}, status=status.HTTP_200_OK)
+    
+@api_view(["PUT"])
+@permission_classes([IsAuthenticated])
+def cancel_borrowed_book(request):
+    isbn = request.data.get("isbn")
+    call_num = request.data.get("call_num")
 
-    return Response({"message": f"Book {actionReturn} successfully"}, status=status.HTTP_200_OK)
+    book = BorrowRecords.objects.filter(
+        book__isbn=isbn, 
+        book__call_number=call_num, 
+        return_date__isnull=True,
+        status=StatusChoices.PENDING
+    ).first()
+    
+    if not book:
+        return Response({"message": "No active book found"}, status=status.HTTP_404_NOT_FOUND)
+
+    book.status = StatusChoices.CANCELLED
+    book.save()
+
+    return Response({"message": "Book borrow cancelled successfully"}, status=status.HTTP_200_OK)
 
 #NOT FINSIHED, WILL FIX LATER
 @csrf_exempt

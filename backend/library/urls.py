@@ -11,6 +11,7 @@ urlpatterns =[
     path('exportBorrowedBooksCSV/', views.export_borrowed_books_csv, name='export_borrowed_books_csv'),
     path('acceptBorrowedBook/', views.accept_borrowed_book, name='accept_borrowed_book'),
     path('returnBook/', views.return_book, name='return_book'),
+    path('cancelBorrowedBook/', views.cancel_borrowed_book, name='cancel_borrowed_book'),
     path('analyticsDashboard/', views.analytics_dashboard, name='analytics_dashboard'), #NOT FINISHED YET
     path('getUserAnalytics/', views.get_user_analytics, name='get_user_analytics'),
     path('getUserCurrentLoans/', views.get_user_current_loans, name='get_user_current_loans'),

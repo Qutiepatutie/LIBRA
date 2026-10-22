@@ -20,7 +20,8 @@ export default function AdminBorrowers() {
         pendingBorrowers,
         currentBorrowers,
         loading,
-        updateBookStatus,
+        returnBook,
+        cancelBook,
         acceptBook,
         searchBorrowers,
         toastMessage,
@@ -63,7 +64,8 @@ export default function AdminBorrowers() {
                 >
                     <BookBorrowerList
                         borrowers={displayedData}
-                        updateBookStatus={updateBookStatus}
+                        returnBook={returnBook}
+                        cancelBook={cancelBook}
                         acceptBook={acceptBook}
                         loading={loading}
                         category={param.category}
