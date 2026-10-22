@@ -1,4 +1,4 @@
-export const statisticsTable = [
+export const userDashboardTable = [
     "Title",
     "Date Borrowed",
     "Due Date",

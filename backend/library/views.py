@@ -96,7 +96,7 @@ def borrow_book(request):
     except Books.DoesNotExist:
         return Response({"message":"Book not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    if BorrowRecords.objects.filter(book=book, return_date__isnull=True).exists():
+    if BorrowRecords.objects.filter(book=book, status=(StatusChoices.PENDING or StatusChoices.ACTIVE)).exists():
         return Response({"message":"Book is already borrowed"}, status=status.HTTP_400_BAD_REQUEST)
 
     BorrowRecords.objects.create(

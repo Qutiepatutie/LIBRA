@@ -5,14 +5,14 @@ import { getStorage } from "../../../pages/auth/auth.util";
 
 import { useBorrowedBooks } from "../../../pages/user/borrowedBooks/useBorrowedBooks"
 import { useBorrowers } from "../../../hooks/useBorrowers";
-import { statisticsTable, historyTable, inventoryTable } from "./table.constants";
+import { userDashboardTable, historyTable, inventoryTable } from "./table.constants";
 
 export default function Table() {
 
     const { borrowedBooks } = useBorrowedBooks();
     const { allBorrowers } = useBorrowers();
     const { pathname } = useLocation();
-    const isLocStats = pathname.endsWith("/statistics") 
+    const isUserDashboard = pathname.endsWith("/dashboard") 
 
     const borrowHistory =
         allBorrowers.filter(borrower =>
@@ -23,8 +23,8 @@ export default function Table() {
     const dueBooks = 
         borrowedBooks.filter(book => book.status === "Due" || book.status === "Overdue");
     
-    const tableTitles = isLocStats
-        ? statisticsTable
+    const tableTitles = isUserDashboard
+        ? userDashboardTable
         : pathname.endsWith("/inventory")
             ? inventoryTable
             :historyTable
@@ -34,7 +34,7 @@ export default function Table() {
     };
     
     const content = () => {
-        if (pathname.endsWith("/statistics")) {
+        if (isUserDashboard) {
             return (
                 dueBooks.map((book, index) => (
                     <tr key={index}>
@@ -75,7 +75,7 @@ export default function Table() {
     
     return (
         <div className={styles.container}>
-            {isLocStats && (
+            {isUserDashboard && (
                 <div className={styles.header} >
                     <p>Borrowed Books Reminder</p>
                 </div>
