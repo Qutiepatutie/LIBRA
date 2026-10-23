@@ -126,6 +126,28 @@ export default function Lrc1() {
                 </div>
                 <div className={styles.timeTableContainer}>
                     <p className={styles.text}><i>Maximum of 2 hours only</i></p>
+                    
+                    <div className={styles.buttons}>
+                        <div className={styles.selector}>
+                            <Selector
+                                placeholder={"Select LRC"}
+                                options={["LRC 1", "LRC 2"]}
+                                value={form.lrc}
+                                onChange={(e) => handleChange("lrc", e.target.value)}
+                            />
+                        </div>
+                        
+                        <div className={styles.selector}>
+                            <Selector
+                                placeholder={"Select Room"}
+                                options={roomSelection[form.lrc]}
+                                value={form.room}
+                                onChange={(e) => handleChange("room", e.target.value)}
+                                disabled={form.lrc === ""}
+                            />
+                        </div>
+                    </div>
+                    
                     <div className={styles.slot}>
                         {
                             Array.from({ length: 14 }).map((_, timeIndex) => {
@@ -182,26 +204,6 @@ export default function Lrc1() {
                                 )
                             })
                         }
-                    </div>
-                    <div className={styles.buttons}>
-                        <div className={styles.selector}>
-                            <Selector
-                                placeholder={"Select LRC"}
-                                options={["LRC 1", "LRC 2"]}
-                                value={form.lrc}
-                                onChange={(e) => handleChange("lrc", e.target.value)}
-                            />
-                        </div>
-                        
-                        <div className={styles.selector}>
-                            <Selector
-                                placeholder={"Select Room"}
-                                options={roomSelection[form.lrc]}
-                                value={form.room}
-                                onChange={(e) => handleChange("room", e.target.value)}
-                                disabled={form.lrc === ""}
-                            />
-                        </div>
                     </div>
                 </div>
     

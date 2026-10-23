@@ -71,3 +71,9 @@
         "table table";
     }
 }
+
+@media (max-width: 500px) {
+    .container {
+        padding: 1em;
+    }
+}

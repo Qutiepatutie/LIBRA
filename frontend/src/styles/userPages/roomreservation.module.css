@@ -156,3 +156,8 @@
         "form";
     }
 }
+@media (max-width: 500px) {
+    .roomReservation {
+        padding: 1em;
+    }
+}
