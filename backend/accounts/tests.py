@@ -1,8 +1,10 @@
+from unittest.mock import patch
+
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from .models import EducationLevel, UserProfile, education_level_for_program
+from .models import EducationLevel, UserLogin, UserProfile, education_level_for_program
 
 
 class EducationLevelForProgramTests(TestCase):
@@ -38,3 +40,32 @@ class RegisterEducationLevelTests(TestCase):
                 self.assertEqual(self.register(program, id_number).status_code, 201)
                 profile = UserProfile.objects.get(id_number=id_number)
                 self.assertEqual(profile.education_level, expected)
+
+
+class GoogleLoginTests(TestCase):
+    def google_login(self, claims):
+        with patch('accounts.views.google_claims_from_code', return_value=claims):
+            return APIClient().post(reverse('google_login'), {'code': 'auth-code'}, format='json')
+
+    def test_rejects_non_fatima_domains(self):
+        for email in ['ana@gmail.com', 'ana@notfatima.edu.ph', 'ana@fatima.edu.ph.evil.com']:
+            with self.subTest(email=email):
+                resp = self.google_login({'email': email, 'email_verified': True})
+                self.assertEqual(resp.status_code, 403)
+
+    def test_rejects_unverified_email(self):
+        resp = self.google_login({'email': 'ana@student.fatima.edu.ph', 'email_verified': False})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_existing_user_gets_tokens(self):
+        UserLogin.objects.create_user(email='ana@student.fatima.edu.ph', password='pass12345')
+        resp = self.google_login({'email': 'Ana@student.fatima.edu.ph', 'email_verified': True})
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('access', resp.data)
+        self.assertEqual(resp.data['user']['email'], 'ana@student.fatima.edu.ph')
+
+    def test_unknown_user_gets_signup_token(self):
+        resp = self.google_login({'email': 'ana@fatima.edu.ph', 'email_verified': True})
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.data['email'], 'ana@fatima.edu.ph')
+        self.assertTrue(resp.data['google_token'])
