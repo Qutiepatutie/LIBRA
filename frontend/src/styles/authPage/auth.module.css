@@ -36,6 +36,15 @@
     color: var(--primary-color);
 }
 
+.registerFirst {
+    color: var(--primary-color);
+    font-size: 0.85em;
+
+    & > u {
+        cursor: pointer;
+    }
+}
+
 .formContainer .group {
     display: flex;
     flex-direction: column;

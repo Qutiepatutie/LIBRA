@@ -83,6 +83,23 @@ export async function login(email, pass) {
    }
 }
 
+export async function googleLogin(code) {
+    try {
+        const response = await fetch(`${API_URL}/google/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ code })
+        });
+
+        return await returnData(response);
+
+    } catch {
+        return ({"status": 500, "message":"Server Connection Error"});
+    }
+}
+
 export async function changePass(email, newPass){
     try {
         const response = await fetch(`${API_URL}/changePass/`, {

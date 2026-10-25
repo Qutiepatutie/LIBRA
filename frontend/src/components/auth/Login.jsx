@@ -7,7 +7,7 @@ import { TextInput, PasswordInput, RememberMeBox } from "../../components/ui/Inp
 import ErrorMessage from "../ui/ErrorMessage.jsx";
 import useForm from "../../hooks/useForm";
 
-export default function Login({ isEmpty, setIsEmpty, credentials, setCredentials, rememberMe, setRememberMe, handleSwitch, setErrorMessage, errorMessage, isLoading }) {
+export default function Login({ isEmpty, setIsEmpty, credentials, setCredentials, rememberMe, setRememberMe, handleSwitch, handleGoogleLogin, setErrorMessage, errorMessage, isLoading }) {
 
     const { handleChange } = useForm({
         setData: setCredentials,
@@ -60,7 +60,7 @@ export default function Login({ isEmpty, setIsEmpty, credentials, setCredentials
             <div className={styles.divider}>or</div>
                 
             <div className={styles.googleLoginContainer}>
-                <div className={styles.googleLogin}>
+                <div className={styles.googleLogin} onClick={handleGoogleLogin}>
                     <img src={google}/>
                     <p>Login with Google</p>
                 </div>
