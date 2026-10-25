@@ -38,14 +38,6 @@ frontend/.env.development
 .env.local
 
 #Test and Notes
-DASHBOARD_PLAN.md
-GUIDELINES.md
-MANUAL_TEST_GUIDE_ANALYTICS.md
-TEST_ANALYTICS.md
-SECURITY_NOTES.md
+/Notes
 seed_data.py
 test_analytics.py
-dashboard_admin.md
-analytics_user.md
-SUPABASE_SCHEMA.md
-API_ENDPOINTS.md
