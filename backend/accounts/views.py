@@ -109,6 +109,14 @@ def register_user(request):
     email = request.data.get('email')
     password = request.data.get('confirm_password')
     role = request.data.get('role')
+    google_token = request.data.get('google_token')
+
+    if google_token:
+        try:
+            email = signing.loads(google_token, salt=GOOGLE_SIGNUP_SALT, max_age=GOOGLE_SIGNUP_MAX_AGE)["email"]
+        except signing.BadSignature:
+            return Response({"message": "Google sign-up expired, try again"}, status=status.HTTP_400_BAD_REQUEST)
+        role = GOOGLE_ALLOWED_DOMAINS[email_domain(email)]
 
     if not all([first_name, last_name, id_number, email, password]):
         return Response({"message": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)

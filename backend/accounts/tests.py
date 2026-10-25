@@ -69,3 +69,27 @@ class GoogleLoginTests(TestCase):
         self.assertEqual(resp.status_code, 404)
         self.assertEqual(resp.data['email'], 'ana@fatima.edu.ph')
         self.assertTrue(resp.data['google_token'])
+
+
+class RegisterWithGoogleTests(TestCase):
+    def register(self, google_token, email='typed@example.com'):
+        return APIClient().post(reverse('register_users'), {
+            'first_name': 'Ana', 'last_name': 'Cruz', 'sex': 'female',
+            'id_number': '01230001234', 'program': 'BS in Nursing',
+            'email': email, 'confirm_password': 'pass12345',
+            'role': 'admin', 'google_token': google_token,
+        }, format='json')
+
+    def test_uses_verified_email_and_domain_role(self):
+        with patch('accounts.views.google_claims_from_code',
+                   return_value={'email': 'ana@fatima.edu.ph', 'email_verified': True}):
+            token = APIClient().post(reverse('google_login'), {'code': 'c'}, format='json').data['google_token']
+
+        self.assertEqual(self.register(token).status_code, 201)
+        user = UserLogin.objects.get()
+        self.assertEqual(user.email, 'ana@fatima.edu.ph')
+        self.assertEqual(user.role, 'faculty')
+
+    def test_rejects_tampered_token(self):
+        self.assertEqual(self.register('not-a-real-token').status_code, 400)
+        self.assertFalse(UserLogin.objects.exists())
