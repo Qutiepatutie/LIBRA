@@ -87,7 +87,7 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
-    "https://lbrsphr.vercel.app",
+    "https://libra-lrc.vercel.app",
     "https://librasphere-vfmb.onrender.com",
 ]
 
