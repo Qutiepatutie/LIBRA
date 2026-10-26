@@ -39,5 +39,7 @@ frontend/.env.development
 
 #Test and Notes
 /Notes
+
+SECURITY_NOTES.md
 seed_data.py
 test_analytics.py
