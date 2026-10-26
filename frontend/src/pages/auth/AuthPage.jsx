@@ -39,6 +39,9 @@ export default function AuthPage() {
 
     const [rememberMe, setRememberMe] = useState(false);
 
+    // Verified Google email waiting to be registered ({ email, google_token })
+    const [googleSignup, setGoogleSignup] = useState(null);
+
     const navigate = useNavigate();
 
      const {
@@ -56,6 +59,7 @@ export default function AuthPage() {
 
         // actions
         login,
+        googleLogin,
         forgotPass,
         register,
     } = useAuth();
@@ -85,7 +89,21 @@ export default function AuthPage() {
         setLoginErrors(initialLoginErrors);
         setForgotPassErrors(initialForgotPassErrors);
         setRegisterErrors(initialRegisterErrors);
+        setGoogleSignup(null);
     };
+
+    const handleGoogleLogin = async () => {
+        setGoogleSignup(await googleLogin(rememberMe));
+    }
+
+    // Carry the verified Google email into the register form
+    function registerWithGoogle() {
+        const pending = googleSignup;
+
+        handleSwitch("register");
+        setGoogleSignup(pending);
+        setRegisterData({ ...initialRegisterData, email: pending.email });
+    }
 
     // Initialize mapping the empty fields
     function buildMissingFields(fields, data) {
@@ -175,8 +193,8 @@ export default function AuthPage() {
             return;
         }
 
-        // Check if email is valid
-        const email = checkEmail(registerData);
+        // Check if email is valid (Google already verified it; the backend assigns the role)
+        const email = googleSignup ? { valid: true } : checkEmail(registerData);
         
         if (part === 3 && !email.valid) {
             setRegisterErrors(prev => ({ ...prev, email: true }));
@@ -199,6 +217,7 @@ export default function AuthPage() {
         const payload = {
             ...registerData,
             role: email.role,
+            google_token: googleSignup?.google_token,
         }
         
         const registered = await register(payload);
@@ -206,6 +225,7 @@ export default function AuthPage() {
         if (registered) {
             setRegisterData(initialRegisterData);
             setPart(1);
+            setGoogleSignup(null);
         }
     }
 
@@ -249,10 +269,16 @@ export default function AuthPage() {
                             rememberMe={rememberMe}
                             setRememberMe={setRememberMe}
                             handleSwitch={handleSwitch}
+                            handleGoogleLogin={handleGoogleLogin}
                             setErrorMessage={setErrorMessage}
                             errorMessage={errorMessage}
                             isLoading={isLoading}
                         />
+                    }
+                    {mode === "login" && googleSignup &&
+                        <p className={styles.registerFirst}>
+                            No account yet, <u onClick={registerWithGoogle}>register first</u>
+                        </p>
                     }
                     {mode === "register" &&
                         <Register
@@ -261,6 +287,7 @@ export default function AuthPage() {
                             part={part}
                             setPart={setPart}
                             registerData={registerData}
+                            isEmailLocked={Boolean(googleSignup)}
                             errorMessage={errorMessage}
                             setRegisterData={setRegisterData}
                             setErrorMessage={setErrorMessage}

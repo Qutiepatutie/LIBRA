@@ -9,7 +9,7 @@ import ErrorMessage from "../../ui/ErrorMessage.jsx";
 
 import useForm from "../../../hooks/useForm.js";
 
-export default function Register({ isEmpty, setIsEmpty, part, setPart, registerData, errorMessage, setRegisterData, setErrorMessage, isLoading }) {
+export default function Register({ isEmpty, setIsEmpty, part, setPart, registerData, isEmailLocked, errorMessage, setRegisterData, setErrorMessage, isLoading }) {
 
     const { handleChange } = useForm({
         setData: setRegisterData,
@@ -27,7 +27,7 @@ export default function Register({ isEmpty, setIsEmpty, part, setPart, registerD
             <div className={styles.inputs}>
                 {part === 1 && <First isEmpty={isEmpty} registerData={registerData} onChange={handleChange}/>}
                 {part === 2 && <Second isEmpty={isEmpty} registerData={registerData} onChange={handleChange}/>}
-                {part === 3 && <Third isEmpty={isEmpty} registerData={registerData} onChange={handleChange}/>}
+                {part === 3 && <Third isEmpty={isEmpty} registerData={registerData} isEmailLocked={isEmailLocked} onChange={handleChange}/>}
                 <ErrorMessage message={errorMessage} />
             </div>
             

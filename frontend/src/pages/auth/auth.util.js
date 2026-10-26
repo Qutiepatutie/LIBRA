@@ -28,6 +28,24 @@ export function checkEmail(registerData) {
     return ({ valid: true, role: role, email: email });
 }
 
+// Opens Google's popup; must be called directly from a click handler.
+export function requestGoogleCode() {
+    return new Promise((resolve, reject) => {
+        if (!window.google?.accounts?.oauth2) {
+            reject(new Error("Google sign-in is unavailable"));
+            return;
+        }
+
+        window.google.accounts.oauth2.initCodeClient({
+            client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+            scope: "openid email profile",
+            ux_mode: "popup",
+            callback: (resp) => resp.code ? resolve(resp.code) : reject(new Error(resp.error)),
+            error_callback: (err) => reject(new Error(err.type)),
+        }).requestCode();
+    });
+}
+
 export function logout() {
     sessionStorage.clear();
     localStorage.clear();

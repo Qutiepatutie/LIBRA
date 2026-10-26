@@ -1,6 +1,6 @@
 import { TextInput, PasswordInput } from "../../ui/Inputs"
 
-export default function Third({ isEmpty, registerData, onChange }) {
+export default function Third({ isEmpty, registerData, isEmailLocked, onChange }) {
 
     return (
         <>
@@ -10,6 +10,7 @@ export default function Third({ isEmpty, registerData, onChange }) {
                 name="email"
                 onChange={(e) => onChange("email", e.target.value)}
                 isEmpty={isEmpty.email}
+                disabled={isEmailLocked}
             />        
             
             <PasswordInput 
