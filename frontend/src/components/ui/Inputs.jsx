@@ -84,11 +84,13 @@ export function PasswordInput({ placeholder="", value="", name="", onChange, isE
                     placeholder={placeholder}
                     onChange={onChange}
                 />
-
-                <img
-                    src={showPass ? openBook : closedBook}
-                    onClick={() => setShowPass(!showPass)}
-                />
+                
+                <div className={styles.iconContainer}>
+                    <img
+                        src={showPass ? openBook : closedBook}
+                        onClick={() => setShowPass(!showPass)}
+                    />
+                </div> 
             </div>
         </div>
     )
@@ -99,10 +101,6 @@ export function SearchBar({ value="", name="", placeholder="", label="", onChang
         <div className={styles.searchBar} >
             {label && ( <label>{label}</label> )}
             <div className={styles.searchContainer}>
-                <img
-                    src={searchIcon}
-                    onClick={onClick}
-                />
                 <input
                     type="text"
                     name={name}
@@ -110,6 +108,13 @@ export function SearchBar({ value="", name="", placeholder="", label="", onChang
                     placeholder={placeholder}
                     onChange={onChange}
                 />
+                
+                <div className={styles.iconContainer}>
+                    <img
+                        src={searchIcon}
+                        onClick={onClick}
+                    />
+                </div>
             </div>
         </div>
     )

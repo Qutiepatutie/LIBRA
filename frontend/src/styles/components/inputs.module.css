@@ -123,6 +123,7 @@ label:not(.rememberMe) {
 
 .passContainer,
 .searchContainer {
+    position: relative;
     display: flex;
     align-items: center;
 
@@ -132,6 +133,10 @@ label:not(.rememberMe) {
 
     outline: 2px solid #969891;
     transition: outline 0.25s;
+
+    & > input {
+        padding-right: 2em;
+    }
 }
 
 .searchContainer {
@@ -142,21 +147,37 @@ label:not(.rememberMe) {
 
 .passContainer img,
 .searchContainer img {
+    right: 0.5em;
     width: clamp(0.8em, 1vw, 3em);
     height: clamp(0.8em, 1vw, 3em);
-    margin-right: 0.5em;
     cursor: pointer;
 }
 
-.searchContainer img {
-    margin: 0;
-    margin-left: clamp(0.7em, 1vw, 2em);
+.searchContainer,
+.passContainer {
+
+    & > .iconContainer{
+        position: absolute;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        right: 0;
+        height: 100%;
+        aspect-ratio: 1;
+        /*background-color: antiquewhite;*/
+        
+    }
 }
 
-.passContainer input {
+.searchContainer img {
+    margin-right: 0.5em;
+    /*margin-left: clamp(0.7em, 1vw, 2em);*/
+}
+
+/*.passContainer input {
     width: calc(100% - 1.5em);
     background-color: transparent;
-}
+}*/
 
 .empty {
     outline: 1px solid #BA1A1A !important;
