@@ -1,7 +1,7 @@
 import csv
 import io
 import json
-from .analytics import circulation_trends, borrowing_frequency, inventory_status
+from .admin_analytics import circulation_trends, borrowing_frequency, inventory_status
 from django.views.decorators.csrf import csrf_exempt
 from .decorators import admin_role
 from django.http import HttpResponse, JsonResponse
@@ -266,7 +266,7 @@ def cancel_borrowed_book(request):
 #NOT FINSIHED, WILL FIX LATER
 @csrf_exempt
 @admin_role #checks if user is admin, spoofable rn tho
-def analytics_dashboard(request):
+def admin_analytics_dashboard(request):
     if request.method != 'GET':
         return JsonResponse({"status":"failed", "message":"Invalid request method"})
     try:
