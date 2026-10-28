@@ -13,6 +13,7 @@ urlpatterns =[
     path('returnBook/', views.return_book, name='return_book'),
     path('cancelBorrowedBook/', views.cancel_borrowed_book, name='cancel_borrowed_book'),
     path('adminAnalyticsDashboard/', views.admin_analytics_dashboard, name='admin_analytics_dashboard'), #NOT FINISHED YET
+    path('getCirculationDashboard/', views.get_circulation_dashboard, name='get_circulation_dashboard'),
     path('getUserAnalytics/', views.get_user_analytics, name='get_user_analytics'),
     path('getUserCurrentLoans/', views.get_user_current_loans, name='get_user_current_loans'),
     path('getUserBorrowingHistory/', views.get_user_borrowing_history, name='get_user_borrowing_history'),
