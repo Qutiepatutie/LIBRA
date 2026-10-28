@@ -20,7 +20,8 @@ class BooksSerializer(serializers.ModelSerializer):
             "year_published",
             "pages",
             "cover_url",
-            "date_acquired"
+            "date_acquired",
+            "item_type"
         ]
         
 class AddBooksSerializer(serializers.ModelSerializer):
@@ -38,7 +39,8 @@ class AddBooksSerializer(serializers.ModelSerializer):
             "year_published",
             "pages",
             "cover_url",
-            "date_acquired"
+            "date_acquired",
+            "item_type"
         ]
 
     def validate_isbn(self, value):
