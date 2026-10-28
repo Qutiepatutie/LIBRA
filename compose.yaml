@@ -4,7 +4,7 @@ services:
         ports: ["8000:8000"]
         env_file: ./backend/.env
         environment: 
-            CHOKIDIR_USEPOLLING: "true"
+            CHOKIDAR_USEPOLLING: "true"
         volumes: [./backend:/backend]
 
     frontend:
