@@ -12,7 +12,7 @@ export default function Details({ setShowDetails, book, userBorrowedBooks, setUs
 
     const [showConfirmCancel, setShowConfirmCancel] = useState(false);
 
-    const { updateBookStatus } = useBorrowers();
+    const { cancelBook } = useBorrowers();
 
     function handleCancel() {
         setShowDetails(false);
@@ -20,7 +20,7 @@ export default function Details({ setShowDetails, book, userBorrowedBooks, setUs
             userBorrowedBooks
                 .filter(borrowedBook =>
                     borrowedBook.book.call_number !== book.call_number));
-        updateBookStatus(book.isbn, book.call_number, "cancel");
+        cancelBook(book.isbn, book.call_number);
     }
 
     return (
