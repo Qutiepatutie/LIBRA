@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Books, BorrowRecords
+from .models import Books, BorrowRecords, ItemType
+from accounts.models import EducationLevel
 from accounts.serializers import UserProfileSerializer, UserLoginSerializer
 from django.utils import timezone
 from .models import StatusChoices
@@ -20,7 +21,8 @@ class BooksSerializer(serializers.ModelSerializer):
             "year_published",
             "pages",
             "cover_url",
-            "date_acquired"
+            "date_acquired",
+            "item_type"
         ]
         
 class AddBooksSerializer(serializers.ModelSerializer):
@@ -38,7 +40,8 @@ class AddBooksSerializer(serializers.ModelSerializer):
             "year_published",
             "pages",
             "cover_url",
-            "date_acquired"
+            "date_acquired",
+            "item_type"
         ]
 
     def validate_isbn(self, value):
@@ -117,3 +120,21 @@ class DashboardLoanSerializer(serializers.ModelSerializer):
 class DashboardPageQuerySerializer(serializers.Serializer):
     page = serializers.IntegerField(default=1, min_value=1)
     page_size = serializers.IntegerField(default=20, min_value=1, max_value=100)
+
+
+class CirculationQuerySerializer(serializers.Serializer):
+    range = serializers.ChoiceField(choices=('day', 'week', 'semester', 'year'), default='week')
+    item_type = serializers.ChoiceField(choices=('all', *ItemType.values), default='all')
+    # Repeat the parameter to group several programs, e.g. one college's degrees.
+    program = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    academic_year = serializers.CharField(required=False, default='')
+    semester = serializers.CharField(required=False, default='')
+    education_level = serializers.ChoiceField(choices=EducationLevel.choices, default=EducationLevel.COLLEGE)
+
+    def validate(self, attrs):
+        # Dropdowns send "all" for an unfiltered value; treat it like an omitted parameter.
+        for field in ('academic_year', 'semester'):
+            if attrs[field].strip().lower() == 'all':
+                attrs[field] = ''
+        attrs['program'] = [program for program in attrs['program'] if program.strip().lower() != 'all']
+        return attrs
