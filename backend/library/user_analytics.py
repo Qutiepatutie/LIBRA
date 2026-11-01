@@ -50,7 +50,8 @@ def current_loans(profile, now):
 
 
 def current_term(profile, today):
-    if not profile.education_level or not profile.year_level:
+    # year_level is optional; without it the student follows the default calendar.
+    if not profile.education_level:
         return 'profile_incomplete', None
     terms = list(AcademicTerm.objects.filter(education_level=profile.education_level))
     effective = effective_academic_terms(terms, profile.year_level)

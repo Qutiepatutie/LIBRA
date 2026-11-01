@@ -287,9 +287,16 @@ class AcademicTermTests(DashboardTestCase):
         self.assertIsNone(self.analytics()['statistics']['books_this_semester'])
         self.term(start_date=date(2026, 11, 1))
         self.assertEqual(self.analytics()['academic_term']['status'], 'no_active_term')
-        self.profile.year_level = ''
+        self.profile.education_level = ''
         self.profile.save()
         self.assertEqual(self.analytics()['academic_term']['status'], 'profile_incomplete')
+
+    def test_blank_year_level_follows_default_term_not_overrides(self):
+        default = self.term()
+        self.term(year_level='1', start_date=date(2026, 10, 1))
+        self.profile.year_level = ''
+        self.profile.save()
+        self.assertEqual(self.analytics()['academic_term']['term']['id'], default.pk)
 
     def test_year_override_takes_precedence_before_date_filtering(self):
         self.term()
