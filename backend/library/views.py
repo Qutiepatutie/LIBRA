@@ -4,9 +4,10 @@ import json
 
 from django.views.generic.dates import timezone_today
 
-from .analytics import circulation_trends, borrowing_frequency, inventory_status
+from .admin_analytics import circulation_trends, borrowing_frequency, inventory_status
 from django.views.decorators.csrf import csrf_exempt
 from .decorators import admin_role
+from .permissions import IsAdminRole
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.db.models import F
@@ -18,10 +19,10 @@ from rest_framework import status
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 
-from .models import Books, BorrowRecords, RoomReservation, UserProfile, StatusChoices
-from .serializers import AllBorrowRecordSerializer, RoomReservationSerializer, UserBorrowRecordSerializer, BooksSerializer, AddBooksSerializer
-from .serializers import DashboardLoanSerializer, DashboardPageQuerySerializer
-from . import user_analytics
+from .models import Books, BorrowRecords, UserProfile, StatusChoices
+from .serializers import AllBorrowRecordSerializer, UserBorrowRecordSerializer, BooksSerializer, AddBooksSerializer
+from .serializers import DashboardLoanSerializer, DashboardPageQuerySerializer, CirculationQuerySerializer
+from . import admin_analytics, user_analytics
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -394,7 +395,7 @@ def get_all_reserved_rooms(request):
 #NOT FINSIHED, WILL FIX LATER
 @csrf_exempt
 @admin_role #checks if user is admin, spoofable rn tho
-def analytics_dashboard(request):
+def admin_analytics_dashboard(request):
     if request.method != 'GET':
         return JsonResponse({"status":"failed", "message":"Invalid request method"})
     try:
@@ -406,6 +407,14 @@ def analytics_dashboard(request):
         return JsonResponse({'status' : 'success', 'message' : 'Analytics data fetched successfully','data' : data})
     except Exception as e:
         return JsonResponse({'status' : 'failed', 'message' : 'Analytics data fetch failed', 'error' : str(e)})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdminRole])
+def get_circulation_dashboard(request):
+    query = CirculationQuerySerializer(data=request.query_params)
+    query.is_valid(raise_exception=True)
+    return Response(admin_analytics.circulation_dashboard(query.validated_data, timezone.now()))
 
 
 def _dashboard_profile(request):

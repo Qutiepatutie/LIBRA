@@ -156,7 +156,7 @@ When the term cannot be resolved, `term` and `books_this_semester` are null:
 
 | Status | Meaning |
 | --- | --- |
-| `profile_incomplete` | Education level or year level is missing |
+| `profile_incomplete` | Education level is missing (a blank year level uses the default calendar) |
 | `not_configured` | No applicable term is configured |
 | `no_active_term` | Terms exist, but today is outside their effective windows |
 | `conflict` | More than one effective term is active |
