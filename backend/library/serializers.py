@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Books, BorrowRecords, ItemType
+from .models import Books, BorrowRecords, RoomReservation, ItemType
 from accounts.models import EducationLevel
 from accounts.serializers import UserProfileSerializer, UserLoginSerializer
 from django.utils import timezone

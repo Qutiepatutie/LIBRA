@@ -19,8 +19,8 @@ from rest_framework import status
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 
-from .models import Books, BorrowRecords, UserProfile, StatusChoices
-from .serializers import AllBorrowRecordSerializer, UserBorrowRecordSerializer, BooksSerializer, AddBooksSerializer
+from .models import Books, BorrowRecords, UserProfile, RoomReservation, StatusChoices
+from .serializers import AllBorrowRecordSerializer, UserBorrowRecordSerializer, BooksSerializer, AddBooksSerializer, RoomReservationSerializer
 from .serializers import DashboardLoanSerializer, DashboardPageQuerySerializer, CirculationQuerySerializer
 from . import admin_analytics, user_analytics
 
