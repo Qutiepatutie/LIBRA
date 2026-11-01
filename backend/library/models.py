@@ -18,12 +18,24 @@ class ItemType(models.TextChoices):
     BOOK = 'book', 'Book'
     THESIS = 'thesis', 'Thesis' # hard-bound student capstone research
 
+class ConditionChoices(models.TextChoices):
+    GOOD = 'good', 'Good'
+    LOST = 'lost', 'Lost'
+    DAMAGED = 'damaged', 'Damaged'
+
 # Manages books
 class Books(models.Model):
     item_type = models.CharField(
         max_length=20,
         choices=ItemType.choices,
         default=ItemType.BOOK,
+    )
+
+    # Lost or damaged copies leave the circulating collection until restored to good.
+    condition = models.CharField(
+        max_length=20,
+        choices=ConditionChoices.choices,
+        default=ConditionChoices.GOOD,
     )
 
     call_number = models.CharField(
