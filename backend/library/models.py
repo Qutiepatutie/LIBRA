@@ -11,8 +11,18 @@ class StatusChoices(models.TextChoices):
     RETURNED = 'Returned'
     CANCELLED = 'Cancelled'
 
+class ItemType(models.TextChoices):
+    BOOK = 'book', 'Book'
+    THESIS = 'thesis', 'Thesis' # hard-bound student capstone research
+
 # Manages books
 class Books(models.Model):
+    item_type = models.CharField(
+        max_length=20,
+        choices=ItemType.choices,
+        default=ItemType.BOOK,
+    )
+
     call_number = models.CharField(
         max_length=50,
         unique=True
