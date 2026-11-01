@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Books, BorrowRecords
+from .models import Books, BorrowRecords, RoomReservation
 from accounts.serializers import UserProfileSerializer, UserLoginSerializer
 from django.utils import timezone
 from .models import StatusChoices
@@ -76,6 +76,29 @@ class UserBorrowRecordSerializer(serializers.ModelSerializer):
             "status"
         ]
 
+class RoomReservationSerializer(serializers.ModelSerializer):
+    user = UserProfileSerializer(read_only=True)
+    email = serializers.CharField(
+        source="user.user.email",
+        read_only=True
+    )
+
+    class Meta:
+        model = RoomReservation
+        fields = [
+            "user",
+            "email",
+            "campus",
+            "department",
+            "participants",
+            "lrc",
+            "room",
+            "start_time",
+            "end_time",
+            "status",
+            "created_at",
+            "updated_at"
+        ]
 
 class DashboardLoanSerializer(serializers.ModelSerializer):
     loan_id = serializers.IntegerField(source='pk', read_only=True)

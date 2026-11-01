@@ -43,4 +43,8 @@
     &:focus-visible {
         outline: 2px solid rgba(93,109,79);
     }
+
+    &:hover:is(:disabled) {
+        cursor: not-allowed;
+    }
 }

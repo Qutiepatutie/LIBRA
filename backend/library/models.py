@@ -1,7 +1,9 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
+from django.utils.html import MAX_URL_LENGTH
 from accounts.models import UserProfile, EducationLevel, year_level_validator
+from django.contrib.postgres.fields import ArrayField
 
 class StatusChoices(models.TextChoices):
     ACTIVE = 'Active'
@@ -10,6 +12,7 @@ class StatusChoices(models.TextChoices):
     PENDING = 'Pending'
     RETURNED = 'Returned'
     CANCELLED = 'Cancelled'
+    COMPLETED = 'Completed'
 
 # Manages books
 class Books(models.Model):
@@ -26,11 +29,11 @@ class Books(models.Model):
     title = models.CharField(
         max_length=200
     )
-    
+
     author = models.CharField(
         max_length=100
     )
-    
+
     edition = models.CharField(
         max_length=50,
         blank=True
@@ -57,7 +60,7 @@ class Books(models.Model):
     pages = models.CharField(
         max_length=50
     )
-    
+
     #Media
     cover_url = models.CharField(
         max_length=2048,
@@ -72,7 +75,7 @@ class Books(models.Model):
 
     class Meta:
         db_table = 'books'
-    
+
 class BorrowRecords(models.Model):
     user = models.ForeignKey(
         UserProfile,
@@ -108,6 +111,36 @@ class BorrowRecords(models.Model):
     class Meta:
         db_table = 'borrow_records'
         indexes = [models.Index(fields=['user', 'borrow_date'], name='loan_user_borrow_idx')]
+
+class RoomReservation(models.Model):
+    user = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE
+    )
+
+    campus = models.CharField(max_length=100)
+    department = models.CharField(max_length=100)
+
+    participants = ArrayField(
+        models.CharField(max_length=100),
+        default=list,
+        blank=True,
+    )
+
+    lrc = models.CharField(max_length=100)
+    room = models.CharField(max_length=100)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+
+    status = models.CharField(
+        max_length=20,
+        choices=StatusChoices.choices,
+        default=StatusChoices.PENDING,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at= models.DateTimeField(auto_now=True)
+
 
 
 def effective_academic_terms(terms, year_level):

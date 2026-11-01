@@ -1,0 +1,179 @@
+    .backdrop {
+    position: fixed;
+    inset: 0;
+    width: 100dvw;
+    height: 100dvh;
+    background-color: rgba(0,0,0,0.5);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    z-index: 1000;
+}
+
+.scanParticipants {
+    /*height: clamp(350px, 50vh, 70vh);
+    width: clamp(300px, 35vw, 50vw);*/
+
+    width: min(90vw, 800px);
+    max-height: 90dvh;
+
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: 
+    "header header"
+    "scanner list"
+    "button button";
+
+    overflow-y: auto;
+
+    padding: clamp(0.5em, 1.5vw, 2em);
+    margin-block: auto;
+    border-radius: 10px;
+   
+    background-color: var(--secondary-color);
+
+    & > .header {
+        grid-area: header;
+        padding: 0.5em;
+
+        & > p {
+            font-size: clamp(1.2em, 1.8vw, 2em);
+            text-align: center;
+        }
+    }
+    
+    & > .scannerContainer {
+        grid-area: scanner;
+        height: 100%;
+        aspect-ratio: 1;
+        display: flex;
+
+        justify-content: center;
+        align-items: center;
+        
+        overflow: hidden;
+        
+        /*border: 2px solid black;*/
+
+        & > .scanner {
+            position: relative;
+            height: 90%;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            
+            &::before,
+            &::after {
+                content: "";
+                position: absolute;
+                inset: 0;
+                pointer-events: none;
+                z-index: 1;
+            }
+            
+            /* Top-left and bottom-right corners */
+            &::before {
+                background:
+                    linear-gradient(var(--primary-color), var(--primary-color)) top left / 30px 4px no-repeat,
+                    linear-gradient(var(--primary-color), var(--primary-color)) top left / 4px 30px no-repeat,
+                    linear-gradient(var(--primary-color), var(--primary-color)) bottom right / 30px 4px no-repeat,
+                    linear-gradient(var(--primary-color), var(--primary-color)) bottom right / 4px 30px no-repeat;
+
+            }
+            
+            /* Top-right and bottom-left corners */
+            &::after {
+                background:
+                    linear-gradient(var(--primary-color), var(--primary-color)) top right / 30px 4px no-repeat,
+                    linear-gradient(var(--primary-color), var(--primary-color)) top right / 4px 30px no-repeat,
+                    linear-gradient(var(--primary-color), var(--primary-color)) bottom left / 30px 4px no-repeat,
+                    linear-gradient(var(--primary-color), var(--primary-color)) bottom left / 4px 30px no-repeat;
+            }
+
+            & > video {
+                height: 90%;
+                aspect-ratio: 1;
+                object-fit: cover;
+                border-radius: 10px;
+            }
+        }
+    }
+
+    & > .listContainer {
+        grid-area: list;
+        flex: 1;
+        height: 100%;
+
+        display: flex;
+        flex-direction: column;
+        padding: 2em;
+        gap: 1em;
+        
+        /*background-color: antiquewhite;*/
+
+        & > .header {
+
+            & > .subHeader {
+                font-size: 0.8em;
+            }
+        }
+        
+        & > .list {
+            list-style-type: decimal;    
+            padding-left: 3ch;
+            overflow: auto;
+
+            & > li {
+                margin-bottom: 0.5em;
+            }
+
+            & > li > .participant {
+                position: relative;
+                display: flex;
+                padding-right: 1em;
+
+                justify-content: space-between;
+
+            }
+        }
+    }
+
+    & > .buttons {
+        grid-area: button;
+
+        display: flex;
+        align-items: center;
+        justify-content: right;
+        padding: 1em;
+        gap: 0.5em;
+
+        & > * {
+            height: 2em;
+        }
+    }
+}
+
+@media (max-width: 768px) {
+    
+    .scanParticipants {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(0, 5fr) minmax(0, 4fr) 0.5fr;
+        grid-template-areas: 
+        "header"
+        "scanner"
+        "list"
+        "button";
+
+        & > .scannerContainer {
+            justify-self: center;
+        }
+    }
+
+    .listContainer > .list {
+        overflow: hidden;
+    }
+}

@@ -10,7 +10,7 @@ import Status from "../../../components/ui/Status.jsx"
 import CustomButton from "../../../components/ui/CustomButton.jsx"
 
 export default function History() {
-    const { allBorrowers, searchBorrowers } = useBorrowers();
+    const { allBorrowers, allReservations, searchBorrowers } = useBorrowers();
     const [query, setQuery] = useState("");
 
     const { pathname } = useLocation();
@@ -19,8 +19,10 @@ export default function History() {
     const borrowerList = query
     ? searchBorrowers(allBorrowers, query)
     : allBorrowers;
-
-    const reservationList = [];
+    
+    const reservationList = query
+        ? searchBorrowers(allReservations, query)
+        : allReservations;
 
     const tableData = {
         books: {
@@ -108,13 +110,28 @@ export default function History() {
                                         <tr key={index}>
                                             <td>{index + 1}</td>
                                             <td>{b.user.id_number}</td>
-                                            <td>{`${b.user.first_name} ${b.user.last_name}`}</td>
+                                            <td>${b.user.first_name} ${b.user.last_name}</td>
                                             <td>{b.user.program}</td>
                                             <td>{b.book.call_number}</td>
                                             <td>{b.borrow_date ? b.borrow_date.slice(0, 10) : "--"}</td>
                                             <td>{b.due_date ? b.due_date.slice(0, 10) : "--"}</td>
                                             <td>{b.return_date ? b.return_date.slice(0, 10) : "--"}</td>
                                             <td className={styles.status}><Status status={b.status} /></td>
+                                        </tr>
+                                    ))
+                                }
+                                {page === "rooms" &&
+                                    reservationList.map((r, index) => (
+                                        <tr key={index}>
+                                            <td>{index + 1}</td>
+                                            <td>{r.user.id_number}</td>
+                                            <td>{r.user.first_name} {r.user.last_name}</td>
+                                            <td>{r.user.program}</td>
+                                            <td>{r.lrc}</td>
+                                            <td>{r.room}</td>
+                                            <td>{r.updated_at.slice(0,10)}</td>
+                                            <td>{Number(r.start_time.slice(0,2)) % 12 || 12}:00 {Number(r.start_time.slice(0,2)) >= 12 ? "PM" : "AM"}</td>
+                                            <td>{r.status}</td>
                                         </tr>
                                     ))
                                 }

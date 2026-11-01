@@ -2,26 +2,78 @@ export const initialForm = {
     name: "",
     program: "",
     campus: "Laguna",
-    contact_number: "",
     id_number: "",
-    dept: "",
-    email: "",
+    department: "",
+    participants: [],
     lrc: "",
     room: "",
-    time: {start_time: "", end_time: ""}
+    start_time: "",
+    end_time: ""
 }
-
-export const formFields = [
-    {label: "Name", name: "name"},
-    {label: "Program", name: "program"},
-    {label: "Contact Number", name: "contact_number"},
-    {label: "Campus", name: "campus"},
-    {label: "ID Number", name: "id_number"},
-    {label: "Department", name: "dept"},
-    {label: "Email", name: "email"},
-]
 
 export const roomSelection = {
     "LRC 1": ["Room 1", "Room 2"],
     "LRC 2": ["Room 1"],
 }
+
+export const departments = [
+    {
+        department: "SSHS (Strengthened SHS)",
+        programs: [
+            "ABM",
+            "STEM",
+            "HUMSS"
+        ]
+    },
+    {
+        department: "College of Computer Studies",
+        programs: [
+            "BS in Information Technology",
+            "BS in Computer Science"
+        ]
+    },
+    {
+        department: "College of Nursing",
+        programs: [
+            "BS in Nursing"
+        ]
+    },
+    {
+        department: "College of Physical Therapy",
+        programs: [
+            "BS in Physical Therapy"
+        ]
+    },
+    {
+        department: "College of Pharmacy",
+        programs: [
+            "BS in Pharmacy"
+        ]
+    },
+    {
+        department: "College of Hospitality and Institutional Management",
+        programs: [
+            "BS in Culinary",
+            "BS in International Tourism Management"
+        ]
+    },
+    {
+        department: "College of Medical and Laboratory Science",
+        programs: [
+            "BS in Medical and Laboratory Science"
+        ]
+    },
+    {
+        department: "College of Business and Accounting",
+        programs: [
+            "BS in Accountancy",
+            "BS in Accounting Information Systems"
+        ]
+    },
+    {
+        department: "College of Arts and Sciences",
+        programs: [
+            "BS in Psychology"
+        ]
+    }
+];

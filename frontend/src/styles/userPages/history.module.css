@@ -40,6 +40,11 @@
         font-size: clamp(0.8em, 1vw, 3em);
     }
 
+    &.table {
+        overflow: auto;
+        padding: 0.5em 0;
+    }
+
     &:last-child {
         display: flex;
         flex-direction: row;

@@ -1,6 +1,6 @@
 export function checkEmail(registerData) {
 
-    if(!registerData.email.endsWith("fatima.edu.ph")){
+    if(!registerData.email.endsWith("@fatima.edu.ph")){
         return { valid : false };
     }
     

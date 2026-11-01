@@ -4,7 +4,7 @@ import CustomButton from "../ui/CustomButton.jsx"
 
 import roomIcon from "../../assets/pages/admin/admission/roomAdmission.svg"
 
-export default function RoomReservationList({ borrowers, loading }) {
+export default function RoomReservationList({ reservations, acceptRoomReservation, cancelRoomReservation, loading }) {
     
     // FOR TESTING
     // borrowers = [
@@ -29,12 +29,14 @@ export default function RoomReservationList({ borrowers, loading }) {
         const hour = time.split(":")[0];
         return `${hour % 12 || 12}:00 ${hour >= 12 ? "PM" : "AM"}`;
     }
+
+    console.log(reservations);
     
     return (
         <div className={styles.list} >
-            {borrowers.length === 0
+            {reservations.length === 0
                 ? <p className={styles.noBorrowers}>No Current Reservations</p>
-                : borrowers.map((borrower, index) => (
+                : reservations.map((borrower, index) => (
                     <div key={index} className={styles.panel}>
                         <div className={styles.itemContainer}>
                             <p className={styles.room}>{borrower.room}</p>
@@ -42,7 +44,7 @@ export default function RoomReservationList({ borrowers, loading }) {
                             <p className={styles.lrc}>{borrower.lrc}</p>
                         </div>
                         <div className={styles.borrowerInfo}>
-                            <p>Time: {formatTime(borrower.time.start)} - {formatTime(borrower.time.end)}</p>
+                            <p>Time: {formatTime(borrower.start_time)} - {formatTime(borrower.end_time)}</p>
                             <p>Name: {borrower.user.first_name} {borrower.user.last_name}</p>
                             <p>ID: {borrower.user.id_number}</p>
                         </div>
@@ -53,7 +55,7 @@ export default function RoomReservationList({ borrowers, loading }) {
                                     <CustomButton
                                         value="X"
                                         action="clear"
-                                        onClick={() => {}}
+                                        onClick={() => {cancelRoomReservation(borrower)}}
                                         disabled={loading}
                                     />
                                 </div>
@@ -61,7 +63,10 @@ export default function RoomReservationList({ borrowers, loading }) {
                             <div className={styles.accept}>
                                 <CustomButton
                                     value={"Reserve"}
-                                    onClick={() => {}}
+                                    onClick={() => {
+                                        acceptRoomReservation(borrower);
+                                        console.log(borrower);
+                                    }}
                                     action={loading ? "loading" : ""}
                                 />
                             </div>

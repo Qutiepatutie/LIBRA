@@ -1,6 +1,9 @@
 import csv
 import io
 import json
+
+from django.views.generic.dates import timezone_today
+
 from .analytics import circulation_trends, borrowing_frequency, inventory_status
 from django.views.decorators.csrf import csrf_exempt
 from .decorators import admin_role
@@ -15,8 +18,8 @@ from rest_framework import status
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 
-from .models import Books, BorrowRecords, UserProfile, StatusChoices
-from .serializers import AllBorrowRecordSerializer, UserBorrowRecordSerializer, BooksSerializer, AddBooksSerializer
+from .models import Books, BorrowRecords, RoomReservation, UserProfile, StatusChoices
+from .serializers import AllBorrowRecordSerializer, RoomReservationSerializer, UserBorrowRecordSerializer, BooksSerializer, AddBooksSerializer
 from .serializers import DashboardLoanSerializer, DashboardPageQuerySerializer
 from . import user_analytics
 
@@ -262,6 +265,131 @@ def cancel_borrowed_book(request):
     book.save()
 
     return Response({"message": "Book borrow cancelled successfully"}, status=status.HTTP_200_OK)
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def reserve_room(request):
+    try:
+        user = request.user.profile
+    except UserProfile.DoesNotExist:
+        return Response({"message":"User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if RoomReservation.objects.filter(user=user, status=(StatusChoices.PENDING)):
+        return Response({"message":"You cannot reserve 2 or more room at a time"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    serializer = RoomReservationSerializer(data=request.data)
+
+    if not serializer.is_valid():
+        return Response({
+            "message": "Invalid request",
+            "errors": serializer.errors,
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    serializer.save(user=user)
+    return Response({
+        "message": "Room Reserved Successfully",
+        "data": serializer.data,
+    }, status=status.HTTP_201_CREATED)
+    
+@api_view(["PUT"])
+@permission_classes([IsAuthenticated])
+def accept_reserved_room(request):
+    start_time = request.data.get("start_time")
+    end_time = request.data.get("end_time")
+    
+    try:
+        reservation = RoomReservation.objects.get(
+            start_time=start_time,
+            end_time=end_time,
+            status=StatusChoices.PENDING
+        ) 
+        
+    except RoomReservation.DoesNotExist:
+            return Response({
+                "message":"Reservation not found"
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    reservation.status = StatusChoices.ACTIVE
+    
+    reservation.save(update_fields=["status", "updated_at"])
+
+    return Response({
+        "message": "Current room reservation is now active",
+    }, status=status.HTTP_200_OK)
+
+@api_view(["PUT"])
+@permission_classes([IsAuthenticated])
+def cancel_reserved_room(request):
+    start_time = request.data.get("start_time")
+    end_time = request.data.get("end_time")
+    
+    try:
+        reservation = RoomReservation.objects.get(
+            start_time=start_time,
+            end_time=end_time,
+            status=StatusChoices.PENDING
+        ) 
+        
+    except RoomReservation.DoesNotExist:
+            return Response({
+                "message":"Reservation not found"
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    reservation.status = StatusChoices.CANCELLED
+    
+    reservation.save(update_fields=["status", "updated_at"])
+
+    return Response({
+        "message": "Current room reservation is Cancelled",
+    }, status=status.HTTP_200_OK)
+
+
+def update_expired_reservation():
+    now = timezone.localtime().time()
+
+    RoomReservation.objects.filter(
+        status=StatusChoices.ACTIVE,
+        end_time__lte=now
+    ).update(
+        status=StatusChoices.COMPLETED,
+        updated_at=timezone.now()
+    )
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_user_reserved_rooms(request):
+    update_expired_reservation()
+    
+    try:
+        user = request.user.profile
+    except UserProfile.DoesNotExist:
+        return Response({"message":"User not found"}, status=status.HTTP_404_NOT_FOUND)
+    
+    reserved_rooms = RoomReservation.objects.filter(user=user, status__in=[StatusChoices.PENDING, StatusChoices.ACTIVE])
+    serializer = RoomReservationSerializer(reserved_rooms, many=True)
+
+    return Response({
+        "message": "Reserved room fetched successfully",
+        "data": serializer.data
+    }, status=status.HTTP_200_OK)
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_all_reserved_rooms(request):
+    update_expired_reservation()
+    # if request.user.role != 'admin':
+    #     return Response({
+    #         "message":"Permission Denied"
+    #     }, status=status.HTTP_403_FORBIDDEN)
+        
+    reserved_rooms = RoomReservation.objects.all()
+    serializer = RoomReservationSerializer(reserved_rooms, many=True)
+
+    return Response({
+        "message": "Reserved room fetched successfully",
+        "data": serializer.data
+    }, status=status.HTTP_200_OK)
+
 
 #NOT FINSIHED, WILL FIX LATER
 @csrf_exempt

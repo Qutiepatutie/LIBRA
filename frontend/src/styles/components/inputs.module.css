@@ -79,9 +79,15 @@ textarea {
 }
 
 select {
+    max-width: 100%;
+    min-width: 0;
     border: none;
     cursor: pointer;
-    color: var(--primary-color);
+    /*color: var(--primary-color);*/
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .searchContainer input {
@@ -108,7 +114,8 @@ label:not(.rememberMe) {
     font-size: clamp(0.7em, 1vw, 2em);
 }
 
-.formInput > label {
+.formInput > label,
+.selector > label{
     font-size: clamp(0.7em, 1vw, 2em);
     
 }
@@ -180,5 +187,5 @@ label:not(.rememberMe) {
 }*/
 
 .empty {
-    outline: 1px solid #BA1A1A !important;
+    outline: 2px solid #BA1A1A !important;
 }

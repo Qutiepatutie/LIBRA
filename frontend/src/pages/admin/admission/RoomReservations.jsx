@@ -12,7 +12,9 @@ export default function RoomReservations() {
     const [currentQuery, setCurrentQuery] = useState("");
     
     const {
-        currentBorrowers,
+        pendingReservations,
+        acceptRoomReservation,
+        cancelRoomReservation,
         loading,
         searchBorrowers,
         toastMessage,
@@ -20,8 +22,10 @@ export default function RoomReservations() {
     } = useBorrowers();
     
     const displayedCurrent = currentQuery
-        ? searchBorrowers(currentBorrowers, currentQuery)
-        : currentBorrowers;
+        ? searchBorrowers(pendingReservations, currentQuery)
+        : pendingReservations;
+    
+    console.log(pendingReservations);
     
     return (
         <>
@@ -42,7 +46,10 @@ export default function RoomReservations() {
                     }
                 >
                     <RoomReservationList
-                        borrowers={[]}
+                        reservations={displayedCurrent}
+                        acceptRoomReservation={acceptRoomReservation}
+                        cancelRoomReservation={cancelRoomReservation}
+                        loading={loading}
                     /> 
                 </div>
             </div>

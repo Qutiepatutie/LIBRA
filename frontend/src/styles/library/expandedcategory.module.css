@@ -28,6 +28,8 @@
 
     padding: 1em;
     padding-top: 0;
+
+    margin-block: auto;
     
     transform: scale(0.8);
     animation: zoom 0.5s forwards;

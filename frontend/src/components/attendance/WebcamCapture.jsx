@@ -1,32 +1,28 @@
+import { useCallback } from "react";
 import { useRef, useEffect } from "react";
 import Webcam from "react-webcam"
 
-export default function WebcamCapture({ onScan, className }) {
+export default function WebcamCapture({ onScan }) {
      const webcamRef = useRef(null);
 
      const capture = () => {
-          const imageSrc = webcamRef.current.getScreenshot();
-          onScan(imageSrc);
+        const imageSrc = webcamRef.current.getScreenshot();
+        onScan(imageSrc);
      }
           
-     useEffect(() => {
-          const timer = setInterval(() => {
-               capture();
-          }, 100);
-          return () => clearInterval(timer);
-     })
+    useEffect(() => {
+        const timer = setInterval(() => {
+            capture();
+        }, 150);
+        return () => clearInterval(timer);
+    });
      
      return (
-          <div>
-               <Webcam
-                    className={className}
-                    audio={false}
-                    ref={webcamRef}
-                    screenshotFormat="image/jpeg"
-                    videoConstraints={{ facingMode: "environment" }}
-                    onClick={() => capture()}
-               />
-                    
-          </div>
+        <Webcam
+            audio={false}
+            ref={webcamRef}
+            screenshotFormat="image/jpeg"
+            onClick={capture}
+        />
      )
 }

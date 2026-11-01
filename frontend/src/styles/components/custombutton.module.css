@@ -11,6 +11,7 @@
     color: #DCEEC9;
     font-weight: 700;
     font-size: clamp(0.9em, .9vw, 1.2em);
+    padding: 0 1em;
 
     &:hover {
         cursor: pointer;
