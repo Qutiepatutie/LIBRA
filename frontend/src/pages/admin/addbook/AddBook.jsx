@@ -127,7 +127,15 @@ export default function AddBook() {
         }
 
         addBook(bookData);
-        setBookData(initialFormValues);
+        // setBookData(initialFormValues);
+        setBookData(prev => ({
+            ...prev,
+            ...Object.fromEntries(
+                Object.entries(initialFormValues).filter(([key]) => (
+                    key !== "classification"
+                ))
+            )
+        }))
         setAutofilled(false);
         if(!isSubmitting) notify();
     }

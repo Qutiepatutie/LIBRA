@@ -19,6 +19,7 @@ urlpatterns =[
     path('getUserReservedRooms/', views.get_user_reserved_rooms, name='get_user_reserved_rooms'),
     path('getCirculationDashboard/', views.get_circulation_dashboard, name='get_circulation_dashboard'),
     path('getInventoryDashboard/', views.get_inventory_dashboard, name='get_inventory_dashboard'),
+    path('getBorrowersDashboard/', views.get_borrowers_dashboard, name='get_borrowers_dashboard'),
     path('getUserAnalytics/', views.get_user_analytics, name='get_user_analytics'),
     path('getUserCurrentLoans/', views.get_user_current_loans, name='get_user_current_loans'),
     path('getUserBorrowingHistory/', views.get_user_borrowing_history, name='get_user_borrowing_history'),
