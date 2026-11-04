@@ -3,7 +3,8 @@
 `GET /getCirculationDashboard/` feeds the Circulation tab of the admin dashboard
 (Figma node `2654:1893`). It requires `Authorization: Bearer <jwt>` and an account
 whose `role` is `admin`: `401` without a token, `403` for any other role. The
-legacy `?id_number=` check used by `/adminAnalyticsDashboard/` is not used here.
+old `/adminAnalyticsDashboard/` trusted a spoofable `?id_number=`; it was removed on
+`feature/admin-inventory-dashboard` (see `ADMIN_INVENTORY_ANALYTICS.md`).
 
 ## Query parameters
 
@@ -86,4 +87,5 @@ otherwise the term running today gives `active`, else `no_active_term` /
 
 `Books.item_type` (`book` default, `thesis` for hard-bound capstone research) was added
 in migration `0007_books_item_type`; existing rows become `book`. It is exposed on
-`getBooks/` and accepted by `addBook/`.
+`getBooks/` and accepted by `addBook/`, and by `editBook/` as `itemType`
+(an unknown value returns `400`).

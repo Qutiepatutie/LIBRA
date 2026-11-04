@@ -1,12 +1,7 @@
 import csv
 import io
 import json
-
-from django.views.generic.dates import timezone_today
-
-from .admin_analytics import circulation_trends, borrowing_frequency, inventory_status
 from django.views.decorators.csrf import csrf_exempt
-from .decorators import admin_role
 from .permissions import IsAdminRole
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
@@ -19,10 +14,10 @@ from rest_framework import status
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 
-from .models import Books, BorrowRecords, UserProfile, RoomReservation, StatusChoices
+from .models import Books, BorrowRecords, UserProfile, RoomReservation, StatusChoices, ItemType, ConditionChoices
 from .serializers import AllBorrowRecordSerializer, UserBorrowRecordSerializer, BooksSerializer, AddBooksSerializer, RoomReservationSerializer
 from .serializers import DashboardLoanSerializer, DashboardPageQuerySerializer, CirculationQuerySerializer
-from . import admin_analytics, borrower_analytics, user_analytics
+from . import admin_analytics, inventory_analytics, borrower_analytics, user_analytics
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -71,6 +66,13 @@ def edit_book(request):
     if new_call_number and Books.objects.exclude(pk=book.pk).filter(call_number=new_call_number).exists():
         return Response({"message":"Call number already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
+    item_type = request.data.get("itemType", book.item_type)
+    condition = request.data.get("condition", book.condition)
+    if item_type not in ItemType.values:
+        return Response({"message":"Invalid item type"}, status=status.HTTP_400_BAD_REQUEST)
+    if condition not in ConditionChoices.values:
+        return Response({"message":"Invalid condition"}, status=status.HTTP_400_BAD_REQUEST)
+
     book.description = request.data.get("description", book.description)
     book.title = request.data.get("title", book.title)
     book.author = request.data.get("author", book.author)
@@ -79,6 +81,8 @@ def edit_book(request):
     book.publisher = request.data.get("publisher", book.publisher)
     book.year_published = request.data.get("yearPublished", book.year_published)
     book.tags = request.data.get("tags", book.tags)
+    book.item_type = item_type
+    book.condition = condition
 
     book.save()
 
@@ -392,23 +396,6 @@ def get_all_reserved_rooms(request):
     }, status=status.HTTP_200_OK)
 
 
-#NOT FINSIHED, WILL FIX LATER
-@csrf_exempt
-@admin_role #checks if user is admin, spoofable rn tho
-def admin_analytics_dashboard(request):
-    if request.method != 'GET':
-        return JsonResponse({"status":"failed", "message":"Invalid request method"})
-    try:
-        data = {
-            'circulation_trends' : circulation_trends(),
-            'borrowing_frequency' : borrowing_frequency(),
-            'inventory_status': inventory_status(),
-        }
-        return JsonResponse({'status' : 'success', 'message' : 'Analytics data fetched successfully','data' : data})
-    except Exception as e:
-        return JsonResponse({'status' : 'failed', 'message' : 'Analytics data fetch failed', 'error' : str(e)})
-
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsAdminRole])
 def get_circulation_dashboard(request):
@@ -417,6 +404,11 @@ def get_circulation_dashboard(request):
     return Response(admin_analytics.circulation_dashboard(query.validated_data, timezone.now()))
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdminRole])
+def get_inventory_dashboard(request):
+    return Response(inventory_analytics.inventory_dashboard(timezone.now()))
+  
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsAdminRole])
 def get_borrowers_dashboard(request):
