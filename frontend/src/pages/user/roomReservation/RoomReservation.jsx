@@ -139,9 +139,6 @@ export default function RoomReservation() {
             ...prev,
             participants: [
                 ...prev["participants"],
-                "06230002163",
-                "06230002164",
-                "06230002165",
             ]
         }))
         

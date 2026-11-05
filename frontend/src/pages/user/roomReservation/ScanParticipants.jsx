@@ -12,6 +12,9 @@ export default function ScanParticipants({ user, form, setForm, setConfirmReserv
     const [data, setData] = useState("");
     const [loading, setLoading] = useState(false);
 
+    const min = form?.lrc === "LRC 1" ? 4 : 2;
+    const max = form?.lrc === "LRC 1" ? 10 : 4;
+    
     useEffect(() => {
         if (!data) return;
         
@@ -20,7 +23,7 @@ export default function ScanParticipants({ user, form, setForm, setConfirmReserv
 
             if (data === user
                 || participants.includes(data) 
-                || participants.length === 9
+                || participants.length === (max-1)
             ) {
                 return prev;
             }
@@ -94,8 +97,8 @@ export default function ScanParticipants({ user, form, setForm, setConfirmReserv
                 </div>
                 <div className={styles.listContainer}>
                     <div className={styles.header}>
-                        <p>Participants ({form.participants.length+1}/10):</p>
-                        <p className={styles.subHeader}><i>Minimum of 5</i></p>
+                        <p>Participants ({form.participants.length + 1}/{max}):</p>
+                        <p className={styles.subHeader}><i>Minimum of {min+1}</i></p>
                     </div>
                     <ul className={styles.list}>
                         <li>{user} (You)</li>
@@ -129,7 +132,7 @@ export default function ScanParticipants({ user, form, setForm, setConfirmReserv
                     <div className={styles.reserve}>
                         <CustomButton
                             value="Finish Reservation"
-                            disabled={form.participants.length < 4 || loading}
+                            disabled={form.participants.length < min || loading}
                             onClick={() => handleConfirm()}
                         /> 
                     </div>
