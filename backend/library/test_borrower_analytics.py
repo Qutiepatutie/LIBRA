@@ -13,7 +13,7 @@ from .tests import MANILA, NOW
 
 URL = reverse('get_borrowers_dashboard')
 DEFAULT_FILTERS = {'range': 'week', 'item_type': 'all', 'program': [], 'academic_year': '', 'semester': '',
-                   'education_level': 'college'}
+                   'education_level': 'college', 'role': 'student'}
 
 
 def at(year, month, day, hour=10, minute=0):
@@ -42,7 +42,7 @@ class BorrowersDashboardTests(TestCase):
         self.legacy = self.profile('legacy', 'BS in Information Technology', '')  # level inferred: college
         self.stem = self.profile('stem', 'STEM', EducationLevel.SENIOR_HIGH)
         self.blank = self.profile('blank', '', '')
-        # Not part of the population, so their programs never show up either.
+        # Counted only with role=faculty or role=all; the inactive student never.
         self.faculty = self.profile('faculty', 'BS in Psychology', EducationLevel.COLLEGE, RoleChoices.FACULTY)
         self.disabled = self.profile('disabled', 'BS in Pharmacy', EducationLevel.COLLEGE)
         self.disabled.user.is_active = False
@@ -94,9 +94,10 @@ class BorrowersDashboardTests(TestCase):
         self.loan(self.cs, at(2026, 9, 21), returned=date(2026, 10, 5))         # 14 days, current
         self.loan(self.stem, at(2026, 9, 20), returned=date(2026, 9, 30))       # 10 days, previous
         self.loan(self.nursing, at(2026, 9, 24), returned=date(2026, 10, 2))    # past the previous span
-        # Never counted.
+        # Faculty: a Monday checkout and an 11-day loan returned this week.
         self.loan(self.faculty, at(2026, 10, 5))
         self.loan(self.faculty, at(2026, 9, 25), returned=date(2026, 10, 6))
+        # Never counted.
         self.loan(self.disabled, at(2026, 10, 5))
         self.loan(self.disabled, at(2026, 9, 25), returned=date(2026, 10, 6))
         self.loan(self.nursing, at(2026, 10, 7, 13))                            # after now
@@ -129,7 +130,7 @@ class BorrowersDashboardTests(TestCase):
                                           'previous_start_date': '2026-09-28'})
         self.assertEqual(data['academic_term'], {'status': 'not_configured', 'term': None})
         self.assertEqual(data['statistics'], {
-            'registered_students': 6,
+            'registered_borrowers': 6,
             # cs, legacy, stem borrowed this week: 3*100/6 = 50.0; inactive 6 - 3 = 3.
             'active_borrowers': {'value': 3, 'percentage': 50.0},
             'inactive_borrowers': {'value': 3, 'percentage': 50.0},
@@ -154,6 +155,7 @@ class BorrowersDashboardTests(TestCase):
             ],
             'senior_high': [{'program': 'STEM', 'code': 'STEM', 'count': 1}],
             'unassigned': [{'program': None, 'code': 'Unspecified', 'count': 0}],
+            'faculty': [],
         })
         # Mon: cs 09:00 + legacy 00:30 Manila (a UTC Sunday) = 2; Tue 1; Wed 1.
         self.assertEqual(data['checkouts_by_day_of_week'], weekdays(2, 1, 1, 0, 0, 0))
@@ -165,7 +167,7 @@ class BorrowersDashboardTests(TestCase):
         data = self.get(item_type='thesis')
         stats = data['statistics']
         self.assertEqual(data['filters']['item_type'], 'thesis')
-        self.assertEqual(stats['registered_students'], 6)
+        self.assertEqual(stats['registered_borrowers'], 6)
         self.assertEqual(stats['active_borrowers'], {'value': 1, 'percentage': 16.7})  # 100/6 = 16.67
         self.assertEqual(stats['total_checkouts']['value'], 1)
         self.assertEqual(stats['avg_loan_duration_days']['value'], 1.0)
@@ -182,7 +184,7 @@ class BorrowersDashboardTests(TestCase):
         data = response.data
         self.assertEqual(data['filters']['program'], ['BS in Computer Science', 'STEM'])
         stats = data['statistics']
-        self.assertEqual(stats['registered_students'], 2)
+        self.assertEqual(stats['registered_borrowers'], 2)
         # cs Mon + Tue and stem Wed; both borrowed, so 2/2 = 100.0 and 3/2 = 1.5 per borrower.
         self.assertEqual(stats['active_borrowers'], {'value': 2, 'percentage': 100.0})
         self.assertEqual(stats['inactive_borrowers'], {'value': 0, 'percentage': 0.0})
@@ -192,13 +194,58 @@ class BorrowersDashboardTests(TestCase):
             'college': [{'program': 'BS in Computer Science', 'code': 'BSCS', 'count': 2}],
             'senior_high': [{'program': 'STEM', 'code': 'STEM', 'count': 1}],
             'unassigned': [],
+            'faculty': [],
         })
         everyone = self.get(program='All')
         self.assertEqual(everyone['filters']['program'], [])
-        self.assertEqual(everyone['statistics']['registered_students'], 6)
+        self.assertEqual(everyone['statistics']['registered_borrowers'], 6)
+
+    def test_faculty_role_counts_faculty_only(self):
+        self.seed_week()
+        data = self.get(role='faculty')
+        self.assertEqual(data['filters'], {**DEFAULT_FILTERS, 'role': 'faculty'})
+        self.assertEqual(data['statistics'], {
+            'registered_borrowers': 1,
+            'active_borrowers': {'value': 1, 'percentage': 100.0},
+            'inactive_borrowers': {'value': 0, 'percentage': 0.0},
+            # Nothing in last week's elapsed span, so no percent change.
+            'total_checkouts': {'value': 1, 'previous': 0, 'change_pct': None},
+            # 09-25 to 10-06 = 11 days; no returns in last week's span.
+            'avg_loan_duration_days': {'value': 11.0, 'previous': None, 'change': None},
+            'avg_checkouts_per_borrower': {'value': 1.0, 'previous': None, 'change': None},
+        })
+        self.assertEqual(data['borrowing_frequency_by_program'], {
+            'college': [], 'senior_high': [], 'unassigned': [],
+            'faculty': [{'program': 'BS in Psychology', 'code': 'BSP', 'count': 1}],
+        })
+        self.assertEqual(data['checkouts_by_day_of_week'], weekdays(1, 0, 0, 0, 0, 0))
+
+    def test_all_role_counts_students_and_faculty(self):
+        self.seed_week()
+        data = self.get(role='all')
+        self.assertEqual(data['statistics'], {
+            'registered_borrowers': 7,
+            # cs, legacy, stem, faculty: 400/7 = 57.14; inactive 300/7 = 42.86.
+            'active_borrowers': {'value': 4, 'percentage': 57.1},
+            'inactive_borrowers': {'value': 3, 'percentage': 42.9},
+            'total_checkouts': {'value': 5, 'previous': 2, 'change_pct': 150.0},
+            # (2 + 1 + 14 + 11)/4 = 7.0 vs 10.0.
+            'avg_loan_duration_days': {'value': 7.0, 'previous': 10.0, 'change': -3.0},
+            # 5/4 = 1.25 vs 2/2 = 1.0.
+            'avg_checkouts_per_borrower': {'value': 1.25, 'previous': 1.0, 'change': 0.25},
+        })
+        frequency = data['borrowing_frequency_by_program']
+        # The faculty member's program is not mixed into the college chart.
+        self.assertNotIn('BS in Psychology', [row['program'] for row in frequency['college']])
+        self.assertEqual(frequency['faculty'], [{'program': 'BS in Psychology', 'code': 'BSP', 'count': 1}])
+        self.assertEqual(data['checkouts_by_day_of_week'], weekdays(3, 1, 1, 0, 0, 0))
+        # program still narrows the population, here to the faculty member alone.
+        psychology = self.get(role='all', program='BS in Psychology')['statistics']
+        self.assertEqual(psychology['registered_borrowers'], 1)
+        self.assertEqual(psychology['total_checkouts']['value'], 1)
 
     def test_rejects_invalid_params(self):
-        for params in ({'range': 'month'}, {'item_type': 'magazine'}, {'education_level': 'grad'}):
+        for params in ({'range': 'month'}, {'item_type': 'magazine'}, {'education_level': 'grad'}, {'role': 'admin'}):
             with self.subTest(params=params):
                 self.get(expected=400, **params)
 
@@ -265,7 +312,7 @@ class BorrowersDashboardTests(TestCase):
         self.loan(self.cs, at(2026, 8, 10))  # inside the SHS term only
         data = self.get(range='semester', education_level='senior_high')
         self.assertEqual(data['academic_term']['term']['id'], shs.pk)
-        self.assertEqual(data['statistics']['registered_students'], 6)
+        self.assertEqual(data['statistics']['registered_borrowers'], 6)
         self.assertEqual(data['statistics']['total_checkouts']['value'], 1)
         self.assertEqual(data['borrowing_frequency_by_program']['college'][0],
                          {'program': 'BS in Computer Science', 'code': 'BSCS', 'count': 1})
@@ -276,7 +323,7 @@ class BorrowersDashboardTests(TestCase):
         self.assertEqual(data['academic_term'], {'status': 'not_configured', 'term': None})
         self.assertIsNone(data['period'])
         self.assertEqual(data['statistics'], {
-            'registered_students': 6, 'active_borrowers': None, 'inactive_borrowers': None,
+            'registered_borrowers': 6, 'active_borrowers': None, 'inactive_borrowers': None,
             'total_checkouts': None, 'avg_loan_duration_days': None, 'avg_checkouts_per_borrower': None,
         })
         self.assertIsNone(data['borrowing_frequency_by_program'])
@@ -305,10 +352,10 @@ class BorrowersDashboardTests(TestCase):
     def test_zero_denominators_are_null(self):
         nobody = self.get(program='Nobody')
         stats = nobody['statistics']
-        self.assertEqual(stats['registered_students'], 0)
+        self.assertEqual(stats['registered_borrowers'], 0)
         self.assertEqual(stats['active_borrowers'], {'value': 0, 'percentage': None})
         self.assertEqual(stats['inactive_borrowers'], {'value': 0, 'percentage': None})
-        self.assertEqual(nobody['borrowing_frequency_by_program'], {'college': [], 'senior_high': [], 'unassigned': []})
+        self.assertEqual(nobody['borrowing_frequency_by_program'], {'college': [], 'senior_high': [], 'unassigned': [], 'faculty': []})
         self.assertEqual(nobody['checkouts_by_day_of_week'], weekdays(0, 0, 0, 0, 0, 0))
         quiet = self.get()['statistics']
         self.assertEqual(quiet['active_borrowers'], {'value': 0, 'percentage': 0.0})

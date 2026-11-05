@@ -16,7 +16,7 @@ from rest_framework.pagination import PageNumberPagination
 
 from .models import Books, BorrowRecords, UserProfile, RoomReservation, StatusChoices, ItemType, ConditionChoices
 from .serializers import AllBorrowRecordSerializer, UserBorrowRecordSerializer, BooksSerializer, AddBooksSerializer, RoomReservationSerializer
-from .serializers import DashboardLoanSerializer, DashboardPageQuerySerializer, CirculationQuerySerializer
+from .serializers import DashboardLoanSerializer, DashboardPageQuerySerializer, CirculationQuerySerializer, BorrowersQuerySerializer
 from . import admin_analytics, inventory_analytics, borrower_analytics, user_analytics
 
 @api_view(["GET"])
@@ -412,7 +412,7 @@ def get_inventory_dashboard(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsAdminRole])
 def get_borrowers_dashboard(request):
-    query = CirculationQuerySerializer(data=request.query_params)
+    query = BorrowersQuerySerializer(data=request.query_params)
     query.is_valid(raise_exception=True)
     return Response(borrower_analytics.borrowers_dashboard(query.validated_data, timezone.now()))
 

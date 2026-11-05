@@ -163,3 +163,8 @@ class CirculationQuerySerializer(serializers.Serializer):
                 attrs[field] = ''
         attrs['program'] = [program for program in attrs['program'] if program.strip().lower() != 'all']
         return attrs
+
+
+class BorrowersQuerySerializer(CirculationQuerySerializer):
+    # Which borrowers the Borrowers tab counts; Circulation always counts everyone.
+    role = serializers.ChoiceField(choices=('student', 'faculty', 'all'), default='student')
