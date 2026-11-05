@@ -74,13 +74,11 @@ class InventoryDashboardTests(DashboardTestCase):
 
 class EditBookClassificationTests(DashboardTestCase):
     def test_edit_book_sets_and_validates_item_type_and_condition(self):
-        self.book.isbn = '9780000000001'
-        self.book.save()
         url = reverse('edit_book')
-        response = self.client.put(url, {'isbn': self.book.isbn, 'itemType': 'thesis', 'condition': 'lost'}, format='json')
+        response = self.client.put(url, {'book_id': self.book.pk, 'itemType': 'thesis', 'condition': 'lost'}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
         self.book.refresh_from_db()
         self.assertEqual((self.book.item_type, self.book.condition), ('thesis', 'lost'))
         for field in ('itemType', 'condition'):
-            response = self.client.put(url, {'isbn': self.book.isbn, field: 'bogus'}, format='json')
+            response = self.client.put(url, {'book_id': self.book.pk, field: 'bogus'}, format='json')
             self.assertEqual(response.status_code, 400)
