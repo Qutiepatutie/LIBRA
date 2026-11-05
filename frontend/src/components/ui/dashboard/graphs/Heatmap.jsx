@@ -1,11 +1,13 @@
 import styles from "../../../../styles/components/dashboards/graphs/heatmap.module.css"
 
-const startDate = new Date("8/17/2026");
-const endDate = new Date("12/19/2026");
+// const startDate = new Date("8/17/2026");
+// const endDate = new Date("12/19/2026");
 
-export default function Heatmap({ header, subHeader, data }) {
+export default function Heatmap({ header, subHeader, data = [] }) {
 
     const days = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+    const { start_date: startDate, end_date: endDate } = data.terms ?? {};
 
     const generateWeeks = (start, end) => {
         const weeks = [];
@@ -33,7 +35,9 @@ export default function Heatmap({ header, subHeader, data }) {
         return weeks;
     }
 
-    const weeks = generateWeeks(startDate, endDate);
+    const weeks = startDate && endDate
+        ? generateWeeks(startDate, endDate)
+        : [];
 
     const getCellColor = (count) => {
         if (count === 0) return "#EBEDF0";
@@ -50,44 +54,52 @@ export default function Heatmap({ header, subHeader, data }) {
                 <p>{header}</p>
                 <p className={styles.subHeader}>{subHeader}</p>
             </div>
-            <div className={styles.heatmapContainer}>
-                <div className={styles.heatmap}>
-                    <div className={styles.days}>
-                        {days.map(day => (
-                            <div key={day} className={styles.day}>{day}</div>
-                        ))}
-                    </div>
-
-                    {/* ROW */}
-                    {weeks.map((week, weekIndex) => (
-                        <div key={weekIndex} className={styles.week}>
-                            <div className={`${styles.cell} ${styles.header}`}>W{weekIndex + 1}</div>
-                            
-                            {/* COL */}
-                            {week.map((date, dateIndex) => {
-                                const borrow = data.find(({ date: borrowDate }) => {
-                                    return new Date(borrowDate).toDateString() === date.toDateString();
-                                });
-                                   
-                                return (
-                                    <div
-                                        key={dateIndex}
-                                        className={styles.cell}
-                                        style={{
-                                            backgroundColor: getCellColor(borrow?.count ?? 0)
-                                        }}
-                                    >
-                                        <p className={styles.tooltip}>
-                                            {borrow?.count ?? 0} Borrows<br />
-                                            <span className={styles.dateText}>{date.toLocaleDateString()}</span>
-                                        </p>
-                                    </div>  
-                                ) 
-                            })}
+            {
+                weeks.length === 0
+                    ? (
+                        <p className={styles.noData}>No Data</p>
+                    ): (
+                        <div className={styles.heatmapContainer}>
+                            <div className={styles.heatmap}>
+                                <div className={styles.days}>
+                                    {days.map(day => (
+                                        <div key={day} className={styles.day}>{day}</div>
+                                    ))}
+                                </div>
+            
+                                {/* ROW */}
+                                {weeks.map((week, weekIndex) => (
+                                        <div key={weekIndex} className={styles.week}>
+                                            <div className={`${styles.cell} ${styles.header}`}>W{weekIndex + 1}</div>
+                                            
+                                            {/* COL */}
+                                            {week.map((date, dateIndex) => {
+                                                const borrow = data?.terms?.find(({ date: borrowDate }) => {
+                                                    return new Date(borrowDate).toDateString() === date.toDateString();
+                                                });
+                    
+                                                return (
+                                                    <div
+                                                        key={dateIndex}
+                                                        className={styles.cell}
+                                                        style={{
+                                                            backgroundColor: getCellColor(borrow?.count ?? 0)
+                                                        }}
+                                                    >
+                                                        <p className={styles.tooltip}>
+                                                            {borrow?.count ?? 0} Borrows<br />
+                                                            <span className={styles.dateText}>{date.toLocaleDateString()}</span>
+                                                        </p>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    ))
+                                }
+                            </div>
                         </div>
-                    ))}
-                </div>
-            </div>
+                )
+            }
         </div>
     )
 }

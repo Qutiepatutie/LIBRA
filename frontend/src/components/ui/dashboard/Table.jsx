@@ -7,7 +7,7 @@ import { useBorrowedBooks } from "../../../pages/user/borrowedBooks/useBorrowedB
 import { useBorrowers } from "../../../hooks/useBorrowers";
 import { userDashboardTable, historyTable, inventoryTable } from "./table.constants";
 
-export default function Table() {
+export default function Table({ data = [] }) {
 
     const { borrowedBooks } = useBorrowedBooks();
     const { allBorrowers } = useBorrowers();
@@ -63,12 +63,14 @@ export default function Table() {
 
         if (pathname.endsWith("/inventory")) {
             return (
-                <tr>
-                    <td>ID Number</td>
-                    <td>Book Title</td>
-                    <td>MM/DD</td>
-                    <td>Days</td>
-                </tr>                
+                data?.map((book) => (
+                    <tr key={book.load_id}>
+                        <td>{book.borrower_id}</td>
+                        <td>{book.title}</td>
+                        <td>{book.due_date}</td>
+                        <td>{book.days_overdue}</td>
+                    </tr>                
+                ))
             )
         }
     }
@@ -81,18 +83,23 @@ export default function Table() {
                 </div>
             )}
             <div className={styles.tableContainer}>
-                <table>
-                    <thead>
-                        <tr>
-                            {tableTitles.map(title => (
-                                <th key={title}>{title}</th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {content()}
-                    </tbody>
-                </table>
+                {content().length === 0
+                    ? <p className={styles.empty}>No Record Found</p>
+                    : (
+                        <table>
+                            <thead>
+                                <tr>
+                                    {tableTitles.map(title => (
+                                        <th key={title}>{title}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {content()}
+                            </tbody>
+                        </table>
+                    )
+                }
             </div>
         </div>
     )

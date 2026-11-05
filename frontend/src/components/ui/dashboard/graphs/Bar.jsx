@@ -5,8 +5,8 @@ import { Bar } from "react-chartjs-2"
 
 import getNiceScale from "./getNiceScale";
 
-export default function BarGraph({header, subHeader, data}) {
-    
+export default function BarGraph({ header, subHeader, data = {}, category = "user"}) {
+
     Chartjs.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
     const labels = {
@@ -21,20 +21,36 @@ export default function BarGraph({header, subHeader, data}) {
             "700 Arts & Recreation",
             "800 Literature",
             "900 History & Geography",
-        ]
+        ],
+        circulation: data?.book?.map(book => book.title) ?? [],
+        borrowers: data?.college?.map(item => item.program) ?? [],
     }
 
-    const dataset = labels["user"].map(label => {
-        const entry = data?.subjects?.find(
-            item => item.code === label.split(" ")[0]
-        );
+    const activeLabels = labels[category] ?? [];
 
-        return entry ? entry.count : 0;
-    })
-    
+    const dataset = 
+        category === "user"
+            ? (
+                activeLabels.map(label => {
+                    const entry = data?.subjects?.find(
+                        item => item.code === label.split(" ")[0]
+                    );
+        
+                    return entry ? entry.count : 0;
+                })
+                
+            ) : (
+                category === "circulation"
+                    ? (
+                        data?.book?.map(book => book.count) ?? []
+                    ) : (
+                        data?.college?.map(data => data.count) ?? []
+                    )
+            )
+
     const maxCount = Math.max(...(data?.subjects?.map(item => item.count) ?? [0]))
     const { interval, xAxisMax } = getNiceScale(maxCount);
-    
+
     return (
         <div className={styles.container}>
             <div className={styles.header}>
@@ -45,7 +61,7 @@ export default function BarGraph({header, subHeader, data}) {
                 <div className={`${styles.graph} ${styles.bar}`}>
                     <Bar
                         data={{
-                            labels: labels["user"],
+                            labels: activeLabels,
                             datasets: [
                                 {
                                     data: dataset,
@@ -65,7 +81,13 @@ export default function BarGraph({header, subHeader, data}) {
                                     enabled: true,
                                     displayColors: false,
                                     callbacks: {
-                                        label: (context) => `Books Borrowed: ${context.parsed.x}`
+                                        label: (context) => {
+                                            const label = category === "circulation"
+                                                ? "Borrow Frequency"
+                                                : "Books Borrowed"
+                                            
+                                            return `${label}: ${context.parsed.x}`
+                                        }
                                     }
                                 }
                             },

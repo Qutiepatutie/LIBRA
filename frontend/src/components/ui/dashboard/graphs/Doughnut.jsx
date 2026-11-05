@@ -7,8 +7,10 @@ export default function DoughnutGraph({header, subHeader, data}) {
     
     Chartjs.register(DoughnutController, ArcElement, Tooltip, Legend);
 
+    const { active_borrowers, inactive_borrowers } = data ?? {};
+    
     // TEMPORARY DATA TO DISPLAY THE GRAPH
-    data = [{label:"Active", data: 0}, {label:"Inactive", data: 1}]
+    const dataset = [{label:"Active", data: active_borrowers?.value ?? 0}, {label:"Inactive", data: inactive_borrowers?.value?? 0}]
     
     return (
         <div className={styles.container}>
@@ -20,11 +22,11 @@ export default function DoughnutGraph({header, subHeader, data}) {
                 <div className={`${styles.graph} ${styles.doughnut}`}>
                     <Doughnut
                         data={{
-                            labels: data?.map(data => data.label),
+                            labels: dataset?.map(data => data.label),
                             datasets: [
                                 {
-                                    label: data?.map(item => item.label),
-                                    data: data?.map(item => item.data),
+                                    label: dataset?.map(item => item.label),
+                                    data: dataset?.map(item => item.data),
                                     backgroundColor: [
                                         "#5D6D4F", //Active
                                         "gray" //Inactive
@@ -40,7 +42,11 @@ export default function DoughnutGraph({header, subHeader, data}) {
                                     position: "right",
                                 },
                                 tooltip: {
-                                    enabled: false,
+                                    enabled: true,
+                                    displayColors: false,
+                                    callbacks: {
+                                        label: (context) => `${context.parsed} Users`
+                                    }
                                 }
                             },
                         }}

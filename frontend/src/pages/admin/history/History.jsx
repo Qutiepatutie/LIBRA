@@ -110,7 +110,7 @@ export default function History() {
                                         <tr key={index}>
                                             <td>{index + 1}</td>
                                             <td>{b.user.id_number}</td>
-                                            <td>${b.user.first_name} ${b.user.last_name}</td>
+                                            <td>{b.user.first_name} {b.user.last_name}</td>
                                             <td>{b.user.program}</td>
                                             <td>{b.book.call_number}</td>
                                             <td>{b.borrow_date ? b.borrow_date.slice(0, 10) : "--"}</td>

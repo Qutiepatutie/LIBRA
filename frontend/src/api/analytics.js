@@ -11,3 +11,33 @@ export async function getUserAnalytics() {
         return ({"status": 500, "message":"Connection to Server Failed"});
     }
 }
+
+export async function getAdminCirculationAnalytics() {
+    try {
+        const resp = await authFetch(`${API_URL}/getCirculationDashboard`);
+
+        return await returnData(resp);
+    } catch {
+        return ({"status": 500, "message":"Connection to Server Failed"});
+    }
+}
+
+export async function getAdminInventoryAnalytics() {
+    try {
+        const resp = await authFetch(`${API_URL}/getInventoryDashboard`);
+
+        return await returnData(resp);
+    } catch {
+        return ({"status": 500, "message":"Connection to Server Failed"});
+    }
+}
+
+export async function getAdminBorrowersAnalytics() {
+    try {
+        const resp = await authFetch(`${API_URL}/getBorrowersDashboard`);
+
+        return await returnData(resp);
+    } catch {
+        return ({"status": 500, "message":"Connection to Server Failed"});
+    }
+}

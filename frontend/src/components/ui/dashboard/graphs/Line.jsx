@@ -5,27 +5,40 @@ import { Line } from "react-chartjs-2"
 
 import getNiceScale from "./getNiceScale";
 
-export default function LineGraph({header, subHeader, data}) {
+export default function LineGraph({header, subHeader, data, category = "user", label = "month"}) {
 
     Chartjs.register(CategoryScale, LinearScale, LineElement, PointElement, Tooltip, Legend);
 
-    const labels = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    ];
+    const labels = {
+        month: [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        ],
+        day: [
+            "Mon", "Tue", "Wed", "Thu", "Fri", "Sat",
+        ]
+    };
 
-    const dataset = labels.map((_, index) => {
-        const entry = data?.find(
-            item => item.month.split("-")[1] === (index + 1).toString().padStart(2, "0")
-        );
+    const dataset = Array(labels[label]?.length).fill(0);
 
-        return entry ? entry.count : 0;
-    });
+    data?.forEach(item => {
+        const period = category === "user"
+            ? item.month.split("-")[1]
+            : category === "circulation"
+                ? labels[label].indexOf(item.label)+1
+                : labels[label].indexOf(item.day)+1
+
+        const index = Number(period) - 1;
+
+        if (index >= 0 && index < 12) {
+            dataset[index] += item.count;
+        }
+    })
 
     const maxCount = Math.max(...data?.map(item => item.count) ?? [0]);
 
     const { interval, yAxisMax } = getNiceScale(maxCount);
-    
+
     return (
         <div className={styles.container}>
             <div className={styles.header}>
@@ -36,7 +49,7 @@ export default function LineGraph({header, subHeader, data}) {
                 <div className={styles.graph}>
                     <Line
                         data={{
-                            labels: labels,
+                            labels: labels[label],
                             datasets: [
                                 {
                                     data: dataset,

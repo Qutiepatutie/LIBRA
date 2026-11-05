@@ -6,10 +6,20 @@
 }
 
 .tableContainer {
+    position: relative;
     width: 100%;
     height: 100%;
 
     overflow-x: auto;
+
+    & > .empty {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 3em;
+        color: lightgrey;
+    }
     
     & > table {
         table-layout: fixed;
