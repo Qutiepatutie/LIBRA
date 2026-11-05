@@ -11,7 +11,7 @@ export function useUpdateBook(setShowConfirm, notify) {
 
     async function editBook(bookDetails) {
         
-        const resp = await editBookUtil(bookDetails);
+        const resp = await editBookUtil({ ...bookDetails, book_id: bookDetails.id });
         
         if(resp.status !== 200) {
             setToastMessage(resp.message);
@@ -24,7 +24,7 @@ export function useUpdateBook(setShowConfirm, notify) {
 
     async function borrowBook(book) {
         const data = {
-            isbn: book.isbn,
+            book_id: book.id,
             id_number: getStorage().getItem("id_number")
         }
 

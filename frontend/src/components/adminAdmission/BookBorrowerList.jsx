@@ -31,7 +31,7 @@ export default function BookBorrowerList({ borrowers, returnBook, cancelBook, ac
                                     <CustomButton
                                         value="X"
                                         action="clear"
-                                        onClick={() => cancelBook(borrower.book.isbn, borrower.book.call_number)}
+                                        onClick={() => cancelBook(borrower.book.id)}
                                         disabled={loading}
                                     />
                                 </div>
@@ -44,9 +44,9 @@ export default function BookBorrowerList({ borrowers, returnBook, cancelBook, ac
                                     }
                                     onClick={() => {
                                         if(borrower.status !== "Pending") {
-                                            returnBook(borrower.book.isbn, borrower.book.call_number);
+                                            returnBook(borrower.book.id);
                                         } else {
-                                            acceptBook(borrower.book.isbn, borrower.book.call_number);
+                                            acceptBook(borrower.book.id);
                                         }
                                     }}
 

@@ -5,7 +5,7 @@ export function updateBook(prevBooks, oldBook, updatedBook) {
     const next = { ...prevBooks };
 
     next[oldCategory] = next[oldCategory].filter(
-        book => book.ISBN !== updatedBook.ISBN
+        book => book.id !== updatedBook.id
     );
 
     next[newCategory] = [

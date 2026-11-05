@@ -12,6 +12,9 @@ import { useUpdateBook } from "./useUpdateBook.js";
 import Toast from "../../ui/Toast.jsx"
 import ConfirmBorrowPanel from "../ConfirmBorrowPanel.jsx";
 
+// Statuses that hold an item; the backend refuses a new borrow for any of them.
+const OPEN_LOAN_STATUSES = ["Pending", "Active", "Due", "Overdue"];
+
 export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBook, allBorrowers, setAllBorrowers }){
     const role =
         localStorage.getItem("role") || sessionStorage.getItem("role");
@@ -36,8 +39,9 @@ export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBoo
         editBook,
     } = useUpdateBook(setShowConfirm, notify);
 
+    // Match on the item id: theses often have no ISBN, so many items share a blank one.
     const isBorrowed = allBorrowers.find(
-        b => (b.status === "Active" || b.status === "Pending") && b.book.isbn === currBook.isbn
+        b => OPEN_LOAN_STATUSES.includes(b.status) && b.book.id === currBook.id
     );
 
     const isAdmin = role === "admin";
@@ -92,7 +96,7 @@ export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBoo
 
         setAllBorrowers(prev =>
             prev.map(b =>
-                b.book.isbn === book.isbn
+                b.book.id === book.id
                     ? {...b, status: "Pending"}
                     : b
             )

@@ -43,6 +43,7 @@ class Books(models.Model):
         unique=True
     )
 
+    # Theses usually have no ISBN, so never use it as an item's identity; use the primary key.
     isbn = models.CharField(
         max_length=13,
         blank=True,
@@ -97,6 +98,14 @@ class Books(models.Model):
 
     class Meta:
         db_table = 'books'
+        constraints = [
+            # Many items may lack an ISBN; a present ISBN still identifies one title.
+            models.UniqueConstraint(
+                fields=['isbn'],
+                condition=~models.Q(isbn=''),
+                name='books_isbn_unique_nonblank',
+            ),
+        ]
 
 class BorrowRecords(models.Model):
     user = models.ForeignKey(

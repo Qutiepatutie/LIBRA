@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 from .models import Books, BorrowRecords, RoomReservation, ItemType
 from accounts.models import EducationLevel
 from accounts.serializers import UserProfileSerializer, UserLoginSerializer
@@ -10,6 +11,7 @@ class BooksSerializer(serializers.ModelSerializer):
     class Meta:
         model = Books
         fields = [
+            "id",
             "call_number",
             "isbn",
             "title",
@@ -45,13 +47,17 @@ class AddBooksSerializer(serializers.ModelSerializer):
             "item_type",
             "condition"
         ]
+        extra_kwargs = {
+            # Mirrors books_isbn_unique_nonblank: blank ISBNs (theses) may repeat.
+            "isbn": {"validators": [
+                UniqueValidator(queryset=Books.objects.exclude(isbn=""), message="Book already exists"),
+            ]},
+        }
 
-    def validate_isbn(self, value):
-        if Books.objects.filter(isbn=value).exists():
-            raise serializers.ValidationError(
-                "Book already exists"
-            )
-        return value
+    def validate(self, attrs):
+        if not attrs.get("isbn") and attrs.get("item_type", ItemType.BOOK) != ItemType.THESIS:
+            raise serializers.ValidationError({"isbn": "ISBN is required for books."})
+        return attrs
 
 class AllBorrowRecordSerializer(serializers.ModelSerializer):
     user = UserProfileSerializer(read_only=True)
