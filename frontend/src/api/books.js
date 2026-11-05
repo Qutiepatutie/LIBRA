@@ -66,14 +66,14 @@ export async function getAllBorrowers() {
     }
 }
 
-export async function acceptBorrowedBook(isbn, call_num) {
+export async function acceptBorrowedBook(book_id) {
     try {
         const resp = await authFetch(`${API_URL}/acceptBorrowedBook/`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ isbn, call_num })
+            body: JSON.stringify({ book_id })
         });
     
         return await returnData(resp)
@@ -82,14 +82,14 @@ export async function acceptBorrowedBook(isbn, call_num) {
     }
 }
 
-export async function returnBook(isbn, call_num) {
+export async function returnBook(book_id) {
     try {
         const resp = await authFetch(`${API_URL}/returnBook/` , {
           method: 'PUT',
           headers: {
             'Content-Type':'application/json',
           },
-          body: JSON.stringify({isbn, call_num})
+          body: JSON.stringify({ book_id })
         });
 
         return await returnData(resp);
@@ -99,14 +99,14 @@ export async function returnBook(isbn, call_num) {
     }
 }
 
-export async function cancelBorrowedBook(isbn, call_num) {
+export async function cancelBorrowedBook(book_id) {
     try {
         const resp = await authFetch(`${API_URL}/cancelBorrowedBook/` , {
           method: 'PUT',
           headers: {
             'Content-Type':'application/json',
           },
-          body: JSON.stringify({isbn, call_num})
+          body: JSON.stringify({ book_id })
         });
 
         return await returnData(resp);

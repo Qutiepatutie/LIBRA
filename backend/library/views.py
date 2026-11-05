@@ -31,37 +31,46 @@ def get_books(request):
 @permission_classes([IsAuthenticated])
 def add_books(request):
     call_number = request.data.get("call_number")
-    isbn = request.data.get("isbn")
     title = request.data.get("title")
     author = request.data.get("author")
 
-    if not all([call_number, isbn, title, author]):
+    # ISBN is optional for theses; AddBooksSerializer requires it for books.
+    if not all([call_number, title, author]):
         return Response({'message': 'Missing important fields'}, status=status.HTTP_400_BAD_REQUEST)
 
     serializer = AddBooksSerializer(data=request.data)
 
     if not serializer.is_valid():
-        print(serializer.errors)
-
-        return Response({"message": serializer.errors["isbn"][0]}, status=status.HTTP_400_BAD_REQUEST)
+        first_errors = next(iter(serializer.errors.values()))
+        return Response({"message": first_errors[0], "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
     serializer.save()
     return Response({'message':'Book Successfully Added!'}, status=status.HTTP_200_OK)
 
+def _requested_book_id(request):
+    """Items are identified by primary key: theses may lack an ISBN and call numbers can be edited."""
+    try:
+        return int(request.data.get("book_id"))
+    except (TypeError, ValueError):
+        return None
+
+def _missing_book_id():
+    return Response({"message": "Missing book_id"}, status=status.HTTP_400_BAD_REQUEST)
+
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
 def edit_book(request):
-    isbn = request.data.get("isbn")
+    book_id = _requested_book_id(request)
 
-    if not isbn:
-        return Response({"message":"Missing isbn"}, status=status.HTTP_400_BAD_REQUEST)
+    if book_id is None:
+        return _missing_book_id()
 
     try:
-        book = Books.objects.get(isbn=isbn)
+        book = Books.objects.get(pk=book_id)
     except Books.DoesNotExist:
         return Response({"message":"Book does not exist"}, status=status.HTTP_404_NOT_FOUND)
 
-    new_call_number = request.data.get("callNumber")
+    new_call_number = request.data.get("call_number")
 
     if new_call_number and Books.objects.exclude(pk=book.pk).filter(call_number=new_call_number).exists():
         return Response({"message":"Call number already exists"}, status=status.HTTP_400_BAD_REQUEST)
@@ -79,7 +88,7 @@ def edit_book(request):
     book.call_number = new_call_number or book.call_number
     book.pages = request.data.get("pages", book.pages)
     book.publisher = request.data.get("publisher", book.publisher)
-    book.year_published = request.data.get("yearPublished", book.year_published)
+    book.year_published = request.data.get("year_published", book.year_published)
     book.tags = request.data.get("tags", book.tags)
     book.item_type = item_type
     book.condition = condition
@@ -92,19 +101,24 @@ def edit_book(request):
 @permission_classes([IsAuthenticated])
 def borrow_book(request):
     id_number = request.data.get("id_number")
-    isbn = request.data.get("isbn")
+    book_id = _requested_book_id(request)
 
     try:
         user = UserProfile.objects.get(id_number=id_number)
     except UserProfile.DoesNotExist:
         return Response({"message":"User not found"}, status=status.HTTP_404_NOT_FOUND)
 
+    if book_id is None:
+        return _missing_book_id()
+
     try:
-        book = Books.objects.get(isbn=isbn)
+        book = Books.objects.get(pk=book_id)
     except Books.DoesNotExist:
         return Response({"message":"Book not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    if BorrowRecords.objects.filter(book=book, status=(StatusChoices.PENDING or StatusChoices.ACTIVE)).exists():
+    # A pending request or any checkout not yet returned (Active, Due, Overdue) holds the item.
+    open_statuses = [StatusChoices.PENDING, *user_analytics.OPEN_STATUSES]
+    if BorrowRecords.objects.filter(book=book, status__in=open_statuses).exists():
         return Response({"message":"Book is already borrowed"}, status=status.HTTP_400_BAD_REQUEST)
 
     BorrowRecords.objects.create(
@@ -207,10 +221,12 @@ def export_borrowed_books_csv(request):
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
 def accept_borrowed_book(request):
-    isbn = request.data.get("isbn")
-    call_num = request.data.get("call_num")
+    book_id = _requested_book_id(request)
+    if book_id is None:
+        return _missing_book_id()
 
-    book_record = BorrowRecords.objects.filter(book__isbn=isbn, book__call_number=call_num, return_date__isnull=True).first()
+    # Only a pending request can be accepted; cancelled ones also have no return date.
+    book_record = BorrowRecords.objects.filter(book_id=book_id, status=StatusChoices.PENDING).first()
     if not book_record:
         return Response({"message":"Book not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -231,12 +247,13 @@ def accept_borrowed_book(request):
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
 def return_book(request):
-    isbn = request.data.get("isbn")
-    call_num = request.data.get("call_num")
+    book_id = _requested_book_id(request)
+    if book_id is None:
+        return _missing_book_id()
 
     book = BorrowRecords.objects.filter(
-        book__isbn=isbn,
-        book__call_number=call_num,
+        book_id=book_id,
+        status__in=user_analytics.OPEN_STATUSES,
         return_date__isnull=True
     ).first()
     
@@ -253,12 +270,12 @@ def return_book(request):
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
 def cancel_borrowed_book(request):
-    isbn = request.data.get("isbn")
-    call_num = request.data.get("call_num")
+    book_id = _requested_book_id(request)
+    if book_id is None:
+        return _missing_book_id()
 
     book = BorrowRecords.objects.filter(
-        book__isbn=isbn, 
-        book__call_number=call_num, 
+        book_id=book_id,
         return_date__isnull=True,
         status=StatusChoices.PENDING
     ).first()

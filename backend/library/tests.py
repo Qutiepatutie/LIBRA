@@ -12,7 +12,7 @@ from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import AccessToken
 
 from accounts.models import EducationLevel, UserLogin, UserProfile
-from .models import AcademicTerm, Books, BorrowRecords, LoanFine, StatusChoices
+from .models import AcademicTerm, Books, BorrowRecords, ItemType, LoanFine, StatusChoices
 
 
 MANILA = ZoneInfo('Asia/Manila')
@@ -260,7 +260,7 @@ class UserDashboardAPITests(DashboardTestCase):
 
     def test_checkout_and_return_store_library_local_dates(self):
         loan = self.loan(status=StatusChoices.PENDING, borrow_date=None, due_date=None)
-        payload = {'isbn': self.book.isbn, 'call_num': self.book.call_number}
+        payload = {'book_id': self.book.pk}
         # UTC Oct 6, but the library has already reached Oct 7.
         checkout = datetime(2026, 10, 6, 16, 30, tzinfo=datetime_timezone.utc)
         with patch('django.utils.timezone.now', return_value=checkout):
@@ -422,3 +422,119 @@ class LoanFineTests(DashboardTestCase):
             LoanFine.objects.create(loan=loan, amount_assessed='10.00')
         with self.assertRaises(ProtectedError):
             loan.delete()
+
+
+class ItemIdentityTests(DashboardTestCase):
+    """Theses usually have no ISBN, so item flows identify an item by its primary key."""
+
+    def thesis_data(self, call_number, **changes):
+        values = dict(item_type=ItemType.THESIS, call_number=call_number, isbn='',
+                      title=f'Thesis {call_number}', author='Student', publisher='College',
+                      year_published='2026', pages='80')
+        values.update(changes)
+        return values
+
+    def thesis(self, call_number, **changes):
+        return Books.objects.create(**self.thesis_data(call_number, **changes))
+
+    def post(self, endpoint, payload):
+        return self.client.post(reverse(endpoint), payload, format='json')
+
+    def put(self, endpoint, payload):
+        return self.client.put(reverse(endpoint), payload, format='json')
+
+    def borrow(self, book, profile=None):
+        return self.post('borrow_book', {'id_number': (profile or self.profile).id_number, 'book_id': book.pk})
+
+    def test_two_theses_without_isbn_can_be_added(self):
+        self.assertEqual(self.post('add_book', self.thesis_data('T 001.A 2026')).status_code, 200)
+        omitted = self.thesis_data('T 001.B 2026')
+        del omitted['isbn']
+        response = self.post('add_book', omitted)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(Books.objects.filter(item_type=ItemType.THESIS, isbn='').count(), 2)
+
+    def test_books_still_require_a_unique_isbn(self):
+        book = self.thesis_data('500.A 2026', item_type=ItemType.BOOK)
+        self.assertEqual(self.post('add_book', book).status_code, 400)
+        book['isbn'] = '9780000000001'
+        self.assertEqual(self.post('add_book', book).status_code, 200)
+        for item_type in (ItemType.BOOK, ItemType.THESIS):
+            with self.subTest(item_type=item_type):
+                duplicate = {**book, 'call_number': f'500.B 2026 {item_type}', 'item_type': item_type}
+                response = self.post('add_book', duplicate)
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.data['message'], 'Book already exists')
+
+    def test_database_enforces_isbn_uniqueness_only_when_present(self):
+        self.thesis('T 1')
+        self.thesis('T 2')
+        self.thesis('T 3', isbn='9780000000001')
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            self.thesis('T 4', isbn='9780000000001')
+
+    def test_listings_expose_the_item_id(self):
+        thesis = self.thesis('T 1')
+        self.loan(book=thesis)
+        books = self.client.get(reverse('get_books')).data['data']
+        self.assertIn(thesis.pk, [row['id'] for row in books])
+        loans = self.client.get(reverse('get_all_borrowed_books')).data['data']
+        self.assertEqual([row['book']['id'] for row in loans], [thesis.pk])
+
+    def test_borrowing_one_thesis_without_isbn_does_not_affect_another(self):
+        first, second = self.thesis('T 1'), self.thesis('T 2')
+        for thesis in (second, first):
+            response = self.borrow(thesis)
+            self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(sorted(BorrowRecords.objects.values_list('book_id', flat=True)), sorted([first.pk, second.pk]))
+
+    def test_editing_one_thesis_without_isbn_leaves_others_unchanged(self):
+        first, second = self.thesis('T 1'), self.thesis('T 2')
+        response = self.put('edit_book', {'book_id': second.pk, 'title': 'Revised',
+                                          'call_number': 'T 2 rev', 'year_published': '2025'})
+        self.assertEqual(response.status_code, 200, response.data)
+        second.refresh_from_db()
+        first.refresh_from_db()
+        self.assertEqual((second.title, second.call_number, second.year_published), ('Revised', 'T 2 rev', '2025'))
+        self.assertEqual((first.title, first.call_number), ('Thesis T 1', 'T 1'))
+        self.assertEqual(self.put('edit_book', {'book_id': second.pk, 'call_number': 'T 1'}).status_code, 400)
+
+    def test_missing_or_unknown_item_id_is_a_client_error(self):
+        requests = (('edit_book', self.put, {}), ('borrow_book', self.post, {'id_number': self.profile.id_number}))
+        for endpoint, send, base in requests:
+            for book_id, expected in ((None, 400), ('abc', 400), (999999, 404)):
+                with self.subTest(endpoint=endpoint, book_id=book_id):
+                    payload = base if book_id is None else {**base, 'book_id': book_id}
+                    self.assertEqual(send(endpoint, payload).status_code, expected)
+
+    def test_circulation_actions_target_the_requested_thesis(self):
+        first, second = self.thesis('T 1'), self.thesis('T 2')
+        first_loan = self.loan(book=first, status=StatusChoices.PENDING, borrow_date=None, due_date=None)
+        second_loan = self.loan(book=second, status=StatusChoices.PENDING, borrow_date=None, due_date=None)
+        self.assertEqual(self.put('accept_borrowed_book', {'book_id': second.pk}).status_code, 200)
+        self.assertEqual(self.put('cancel_borrowed_book', {'book_id': first.pk}).status_code, 200)
+        self.assertEqual(self.put('return_book', {'book_id': second.pk}).status_code, 200)
+        first_loan.refresh_from_db()
+        second_loan.refresh_from_db()
+        self.assertEqual(first_loan.status, StatusChoices.CANCELLED)
+        self.assertEqual(second_loan.status, StatusChoices.RETURNED)
+
+    def test_accept_ignores_an_earlier_cancelled_request(self):
+        self.loan(status=StatusChoices.CANCELLED, borrow_date=None, due_date=None)
+        pending = self.loan(status=StatusChoices.PENDING, borrow_date=None, due_date=None)
+        self.assertEqual(self.put('accept_borrowed_book', {'book_id': self.book.pk}).status_code, 200)
+        pending.refresh_from_db()
+        self.assertEqual(pending.status, StatusChoices.ACTIVE)
+
+    def test_open_loan_blocks_a_new_borrow(self):
+        for status in (StatusChoices.ACTIVE, StatusChoices.DUE, StatusChoices.OVERDUE, StatusChoices.PENDING):
+            with self.subTest(status=status):
+                self.loan(status=status)
+                response = self.borrow(self.book, self.other)
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.data['message'], 'Book is already borrowed')
+                self.assertFalse(BorrowRecords.objects.filter(user=self.other).exists())
+                BorrowRecords.objects.all().delete()
+        self.loan(status=StatusChoices.RETURNED, return_date=date(2026, 10, 6))
+        self.loan(status=StatusChoices.CANCELLED)
+        self.assertEqual(self.borrow(self.book, self.other).status_code, 200)

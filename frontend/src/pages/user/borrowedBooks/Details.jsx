@@ -19,8 +19,8 @@ export default function Details({ setShowDetails, book, userBorrowedBooks, setUs
         setUserBorrowedBooks(
             userBorrowedBooks
                 .filter(borrowedBook =>
-                    borrowedBook.book.call_number !== book.call_number));
-        cancelBook(book.isbn, book.call_number);
+                    borrowedBook.book.id !== book.id));
+        cancelBook(book.id);
     }
 
     return (

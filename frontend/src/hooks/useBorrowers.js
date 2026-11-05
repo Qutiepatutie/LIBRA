@@ -62,37 +62,37 @@ export function useBorrowers() {
         });
     }
 
-    async function returnBook(isbn, call_num) {
+    async function returnBook(bookId) {
         setLoading(true);
-        const resp = await returnBookUtil(isbn, call_num);
+        const resp = await returnBookUtil(bookId);
         setLoading(false);
             
         showToastFunc(resp.message);
 
-        if(resp.status === "failed") { return; }
+        if(resp.status !== 200) { return; }
 
         setAllBorrowers(borrowers => 
-            borrowers.filter(b => b.book.isbn !== isbn)
+            borrowers.filter(b => b.book.id !== bookId)
         );
     }
     
-    async function cancelBook(isbn, call_num) {
+    async function cancelBook(bookId) {
         setLoading(true);
-        const resp = await cancelBorrowedBook(isbn, call_num);
+        const resp = await cancelBorrowedBook(bookId);
         setLoading(false);
             
         showToastFunc(resp.message);
 
-        if(resp.status === "failed") { return; }
+        if(resp.status !== 200) { return; }
 
         setAllBorrowers(borrowers => 
-            borrowers.filter(b => b.book.isbn !== isbn)
+            borrowers.filter(b => b.book.id !== bookId)
         );
     }
 
-    async function acceptBook(isbn, call_num) {
+    async function acceptBook(bookId) {
         setLoading(true);
-        const resp = await acceptBorrowedBook(isbn, call_num);
+        const resp = await acceptBorrowedBook(bookId);
         setLoading(false);
         console.log(resp);
 
@@ -103,10 +103,8 @@ export function useBorrowers() {
 
         setAllBorrowers(borrowers => 
             borrowers.map(b => 
-                b.book.isbn === isbn 
-                && b.book.call_number === call_num 
-                && b.status !== "Returned"
-                && b.status !== "Cancelled"
+                b.book.id === bookId
+                && b.status === "Pending"
                 ? {
                     ...b,
                     status: resp.book.status,
