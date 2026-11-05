@@ -1,7 +1,7 @@
 """Borrowers tab of the admin dashboard (Figma `2975:4723`). Contract: backend/ADMIN_BORROWER_ANALYTICS.md
 
 Shares the Circulation tab's filter bar, period windows, term resolution and "vs. previous" rule,
-but is scoped to registered students rather than every borrower.
+but counts only the registered accounts picked by `role` (students by default) rather than every borrower.
 """
 from datetime import timedelta
 
@@ -36,9 +36,21 @@ def education_level_of(education_level, program):
     return education_level or education_level_for_program(program) or 'unassigned'
 
 
-def registered_students(programs):
-    students = UserProfile.objects.filter(user__role=RoleChoices.STUDENT, user__is_active=True)
-    return students.filter(program__in=programs) if programs else students
+ROLES = {
+    'student': (RoleChoices.STUDENT,),
+    'faculty': (RoleChoices.FACULTY,),
+    'all': (RoleChoices.STUDENT, RoleChoices.FACULTY),
+}
+
+
+def program_group(role, education_level, program):
+    # Faculty belong to no student cohort, so their programs get a group of their own.
+    return 'faculty' if role == RoleChoices.FACULTY else education_level_of(education_level, program)
+
+
+def registered_borrowers(role, programs):
+    profiles = UserProfile.objects.filter(user__role__in=ROLES[role], user__is_active=True)
+    return profiles.filter(program__in=programs) if programs else profiles
 
 
 def ratio(numerator, denominator, places=2):
@@ -79,17 +91,18 @@ def window_statistics(loans, start, end, previous_start, now):
     return current, previous
 
 
-def frequency_by_program(students, loans):
+def frequency_by_program(borrowers, loans):
     rows = {}
-    # Programs with registered students appear even with no checkouts in the period.
-    for profile in students.values('education_level', 'program').distinct().order_by():
-        rows.setdefault((profile['education_level'], profile['program'] or None), 0)
-    for row in loans.values('user__education_level', 'user__program').annotate(count=Count('pk')).order_by():
-        key = (row['user__education_level'], row['user__program'] or None)
+    # Programs with registered borrowers appear even with no checkouts in the period.
+    for profile in borrowers.values('user__role', 'education_level', 'program').distinct().order_by():
+        rows.setdefault((profile['user__role'], profile['education_level'], profile['program'] or None), 0)
+    rows_by_program = loans.values('user__user__role', 'user__education_level', 'user__program')
+    for row in rows_by_program.annotate(count=Count('pk')).order_by():
+        key = (row['user__user__role'], row['user__education_level'], row['user__program'] or None)
         rows[key] = rows.get(key, 0) + row['count']
-    grouped = {EducationLevel.COLLEGE.value: {}, EducationLevel.SENIOR_HIGH.value: {}, 'unassigned': {}}
-    for (education_level, program), count in rows.items():
-        programs = grouped[education_level_of(education_level, program)]
+    grouped = {EducationLevel.COLLEGE.value: {}, EducationLevel.SENIOR_HIGH.value: {}, 'unassigned': {}, 'faculty': {}}
+    for (role, education_level, program), count in rows.items():
+        programs = grouped[program_group(role, education_level, program)]
         programs[program] = programs.get(program, 0) + count
     return {level: [
         {'program': program, 'code': PROGRAM_CODES.get(program, program) if program else 'Unspecified',
@@ -108,13 +121,13 @@ def checkouts_by_weekday(loans):
 
 def borrowers_dashboard(params, now):
     today = library_today(now)
-    students = registered_students(params['program'])
-    # circulation_loans applies item_type (and program again, harmlessly); restrict it to the students counted.
-    loans = circulation_loans(params, now).filter(user__in=students)
+    borrowers = registered_borrowers(params['role'], params['program'])
+    # circulation_loans applies item_type (and program again, harmlessly); restrict it to the borrowers counted.
+    loans = circulation_loans(params, now).filter(user__in=borrowers)
     terms = calendar_terms(params['education_level'])
     term_status, term = resolve_term(terms, params, today)
     window = period_window(params['range'], today, term, terms)
-    registered = students.count()
+    registered = borrowers.count()
     statistics = dict.fromkeys(('active_borrowers', 'inactive_borrowers', 'total_checkouts',
                                 'avg_loan_duration_days', 'avg_checkouts_per_borrower'))
     period = frequency = weekdays = None
@@ -133,7 +146,7 @@ def borrowers_dashboard(params, now):
         period = {'start_date': start.isoformat(), 'end_date': (end - timedelta(days=1)).isoformat(),
                   'previous_start_date': previous_start.isoformat() if previous_start else None}
         in_window = loans.filter(borrow_date__gte=day_start(start), borrow_date__lt=day_start(end))
-        frequency = frequency_by_program(students, in_window)
+        frequency = frequency_by_program(borrowers, in_window)
         weekdays = checkouts_by_weekday(in_window)
     return {
         'as_of': timezone.localtime(now, library_timezone()).isoformat(),
@@ -141,7 +154,7 @@ def borrowers_dashboard(params, now):
         'filters': params,
         'period': period,
         'academic_term': {'status': term_status, 'term': term_data(term)},
-        'statistics': {'registered_students': registered, **statistics},
+        'statistics': {'registered_borrowers': registered, **statistics},
         'borrowing_frequency_by_program': frequency,
         'checkouts_by_day_of_week': weekdays,
     }
