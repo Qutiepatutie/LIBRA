@@ -56,6 +56,23 @@ export async function editBook(data){
     }
 }
 
+export async function removeBook(data){
+    try {
+        const resp = await authFetch(`${API_URL}/removeBook/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+
+        return await returnData(resp);
+        
+    } catch {
+        return ({"status": 500, "message":"Connection to Server Failed"});
+    }
+}
+
 export async function getAllBorrowers() {
     try {
         const resp = await authFetch(`${API_URL}/getAllBorrowedBooks/`);

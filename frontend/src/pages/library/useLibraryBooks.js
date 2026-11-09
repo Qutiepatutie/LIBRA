@@ -1,4 +1,4 @@
-import { useState,useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { getBooks } from "../../api/books";
 import { categories } from "./library.constants";
 import { updateBook as updateBookUtil } from "./library.util";
@@ -7,30 +7,30 @@ export function useLibraryBooks() {
     const [books, setBooks] = useState({});
     const [searchedBooks, setSearchedBooks] = useState([]);
 
-    useEffect( () => {
-        const fetch = async () => {
-            const fetchedBooks = await getBooks();
-            console.log(fetchedBooks);
+    const fetchBooks = useCallback(async () => {
+        const fetchedBooks = await getBooks();
+        console.log(fetchedBooks);
 
-            const bookData = {};
+        const bookData = {};
 
-            categories.forEach(({code}) => {
-                bookData[code] = [];
-            });
+        categories.forEach(({code}) => {
+            bookData[code] = [];
+        });
 
-            fetchedBooks.data.map((book) => {
-                const callNumber = book.call_number.substring(0,3).trim();
+        fetchedBooks.data.map((book) => {
+            const callNumber = book.call_number.substring(0,3).trim();
 
-                if(bookData[callNumber]){
-                    bookData[callNumber].push(book);
-                };
-            });
+            if(bookData[callNumber]){
+                bookData[callNumber].push(book);
+            };
+        });
 
-            setBooks(bookData);
-        };
-
-        fetch();
+        setBooks(bookData);
     }, []);
+    
+    useEffect(() => {
+        fetchBooks();
+    }, [fetchBooks]);
 
     function updateBook(updatedBook, activeBook) {
         setBooks(prev => updateBookUtil(prev, activeBook, updatedBook));
@@ -50,5 +50,5 @@ export function useLibraryBooks() {
         setSearchedBooks(filteredBooks);
     }
 
-    return { books, searchedBooks, updateBook, searchBooks };
+    return { books, setBooks, searchedBooks, updateBook, searchBooks, fetchBooks };
 }

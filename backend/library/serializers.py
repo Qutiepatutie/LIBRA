@@ -25,7 +25,8 @@ class BooksSerializer(serializers.ModelSerializer):
             "cover_url",
             "date_acquired",
             "item_type",
-            "condition"
+            "condition",
+            "is_archived",
         ]
         
 class AddBooksSerializer(serializers.ModelSerializer):

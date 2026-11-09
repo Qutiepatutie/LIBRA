@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { borrowBook as borrowBookUtil, editBook as editBookUtil } from "../../../api/books";
+import { borrowBook as borrowBookUtil, editBook as editBookUtil, removeBook as removeBookUtil } from "../../../api/books";
 import { getStorage } from "../../../pages/auth/auth.util";
 
-export function useUpdateBook(setShowConfirm, notify) {
+export function useUpdateBook(setShowConfirm, setShowRemove, notify) {
     
     const [loading, setLoading] = useState(false);
     const [toastMessage, setToastMessage] = useState("");
@@ -22,6 +22,19 @@ export function useUpdateBook(setShowConfirm, notify) {
         setIsEdit(false);
     }
 
+    async function removeBook(bookId) {
+        setLoading(true);
+        const resp = await removeBookUtil({book_id: bookId});
+        setToastMessage(resp.message);
+        setLoading(false);
+
+        if(resp.status === 200) {
+            setShowRemove(false);
+        }
+
+        notify();
+    }
+
     async function borrowBook(book) {
         const data = {
             book_id: book.id,
@@ -39,5 +52,5 @@ export function useUpdateBook(setShowConfirm, notify) {
         notify()
     }
 
-    return { loading, toastMessage, isEdit,setIsEdit, setToastMessage, borrowBook, editBook };
+    return { loading, toastMessage, isEdit,setIsEdit, setToastMessage, borrowBook, editBook, removeBook };
 }

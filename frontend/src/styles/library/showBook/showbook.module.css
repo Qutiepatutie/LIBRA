@@ -84,12 +84,23 @@
         display: flex;
         justify-content: center;
         align-items: flex-end;
+        gap: 0.5em;
 
         & > .buttons {
             height: clamp(2em, 2.5vw, 3em);
             width: 35%; 
             display: flex;
             gap: 0.5em;
+
+        }
+
+        & > .deleteButton {
+            height: clamp(2em, 2.5vw, 3em);
+            margin-right: auto;
+        }
+        
+        & .trash {
+            filter:invert(1);
         }
     }
 }

@@ -37,6 +37,10 @@ class Books(models.Model):
         choices=ConditionChoices.choices,
         default=ConditionChoices.GOOD,
     )
+   
+    is_archived = models.BooleanField(
+        default=False
+    )
 
     call_number = models.CharField(
         max_length=50,

@@ -1,5 +1,6 @@
 import styles from "../../../styles/library/showBook/showbook.module.css"
 import close from "../../../assets/close-icon.svg"
+import trash from "../../../assets/pages/library/trash.svg"
 
 import { useState, useEffect } from "react";
 
@@ -8,23 +9,25 @@ import BookInfos from "./BookInfos.jsx";
 
 import { details } from "./showbook.constants.js"
 import { useUpdateBook } from "./useUpdateBook.js";
+import { getStorage } from "../../../pages/auth/auth.util.js";
 
 import Toast from "../../ui/Toast.jsx"
 import ConfirmBorrowPanel from "../ConfirmBorrowPanel.jsx";
+import ConfirmRemovePanel from "./ConfirmRemovePanel.jsx";
 
 // Statuses that hold an item; the backend refuses a new borrow for any of them.
 const OPEN_LOAN_STATUSES = ["Pending", "Active", "Due", "Overdue"];
 
 export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBook, allBorrowers, setAllBorrowers }){
-    const role =
-        localStorage.getItem("role") || sessionStorage.getItem("role");
+    const role = getStorage().getItem("role");
 
     const notify = () => {
         setShowToast(true);
         setTimeout(() => setShowToast(false), 2000);
     }
 
-    const [showConfirm, setShowConfirm] = useState(false);
+    const [showConfirmBorrow, setShowConfirmBorrow] = useState(false);
+    const [showConfirmRemove, setShowConfirmRemove] = useState(false);
     const [bookDetails, setBookDetails] = useState(currBook);
 
     const [showToast, setShowToast] = useState(false);
@@ -37,7 +40,8 @@ export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBoo
         setToastMessage,
         borrowBook,
         editBook,
-    } = useUpdateBook(setShowConfirm, notify);
+        removeBook,
+    } = useUpdateBook(setShowConfirmBorrow, setShowConfirmRemove, notify);
 
     // Match on the item id: theses often have no ISBN, so many items share a blank one.
     const isBorrowed = allBorrowers.find(
@@ -103,16 +107,30 @@ export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBoo
         );
     }
 
+    const handleRemoveBook = () => {
+        removeBook(currBook.id);
+
+        setShowConfirmRemove(false);
+        setShowBook(false);
+    }
+
     return (
         <>
             <Toast message={toastMessage} show={showToast}/>
             <ConfirmBorrowPanel
-                showConfirm={showConfirm}
-                setShowConfirm={setShowConfirm}
+                showConfirm={showConfirmBorrow}
+                setShowConfirm={setShowConfirmBorrow}
                 currBook={currBook}
                 loading={loading}
                 handleConfirmBorrow={handleConfirmBorrow}
             />
+            {showConfirmRemove && (
+                <ConfirmRemovePanel
+                    setShowConfirm={setShowConfirmRemove}
+                    loading={loading}
+                    handleRemoveBook={handleRemoveBook}
+                />
+            )}
             <div
                 className={styles.backdrop}
                 onClick={() => setShowBook(false)}
@@ -145,12 +163,21 @@ export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBoo
                         </div>
 
                         <div className={styles.buttonContainer}>
+                            {role === "admin" && (
+                                <div className={styles.deleteButton}>
+                                    <CustomButton 
+                                        value={<img className={styles.trash} src={trash} />}
+                                        action="delete"
+                                        onClick={() => {setShowConfirmRemove(true)}}
+                                    />
+                                </div>
+                            )}
                             <div className={styles.buttons}>
                                 {isEdit &&
                                     <CustomButton
-                                    value="Cancel"
-                                    action="cancel"
-                                    onClick={handleCancelEdit}
+                                        value="Cancel"
+                                        action="cancel"
+                                        onClick={handleCancelEdit}
                                     />
                                 }
     

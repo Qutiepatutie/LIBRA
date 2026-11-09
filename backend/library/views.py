@@ -22,7 +22,7 @@ from . import admin_analytics, inventory_analytics, borrower_analytics, user_ana
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_books(request):
-    books = Books.objects.all()
+    books = Books.objects.filter(is_archived=False)
 
     serializer = BooksSerializer(books, many=True)
     return Response({"data": serializer.data}, status=status.HTTP_200_OK)
@@ -31,12 +31,22 @@ def get_books(request):
 @permission_classes([IsAuthenticated])
 def add_books(request):
     call_number = request.data.get("call_number")
+    isbn = request.data.get("isbn")
     title = request.data.get("title")
     author = request.data.get("author")
 
     # ISBN is optional for theses; AddBooksSerializer requires it for books.
     if not all([call_number, title, author]):
         return Response({'message': 'Missing important fields'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    book = Books.objects.filter(call_number=call_number, isbn=isbn).first()
+
+    if book:
+        if book.is_archived:
+            book.is_archived = False
+            book.save(update_fields=["is_archived"])
+            
+            return Response({'message':'Book Successfully Added!'}, status=status.HTTP_200_OK)
 
     serializer = AddBooksSerializer(data=request.data)
 
@@ -45,7 +55,7 @@ def add_books(request):
         return Response({"message": first_errors[0], "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
     serializer.save()
-    return Response({'message':'Book Successfully Added!'}, status=status.HTTP_200_OK)
+    return Response({'message':'Book Successfully Added!'}, status=status.HTTP_201_CREATED)
 
 def _requested_book_id(request):
     """Items are identified by primary key: theses may lack an ISBN and call numbers can be edited."""
@@ -99,6 +109,24 @@ def edit_book(request):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+def remove_book(request): 
+    book_id = _requested_book_id(request)
+
+    if book_id is None:
+        return _missing_book_id()
+
+    try:
+        book = Books.objects.get(pk=book_id)
+    except Books.DoesNotExist:
+        return Response({"message":"Book not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    book.is_archived = True
+    book.save(update_fields=["is_archived"])
+
+    return Response({"message":"Book successfully removed"}, status=status.HTTP_200_OK)
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def borrow_book(request):
     id_number = request.data.get("id_number")
     book_id = _requested_book_id(request)
@@ -115,6 +143,9 @@ def borrow_book(request):
         book = Books.objects.get(pk=book_id)
     except Books.DoesNotExist:
         return Response({"message":"Book not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if book.is_archived:
+        return Response({"message":"Book is archived and cannot be borrowed"}, status=status.HTTP_400_BAD_REQUEST)
 
     # A pending request or any checkout not yet returned (Active, Due, Overdue) holds the item.
     open_statuses = [StatusChoices.PENDING, *user_analytics.OPEN_STATUSES]

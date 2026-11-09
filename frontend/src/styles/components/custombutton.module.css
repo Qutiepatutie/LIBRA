@@ -32,7 +32,8 @@
     color: black;
 }
 
-.cancel {
+.cancel,
+.delete{
     background-color: #BA1A1A;
 }
 
