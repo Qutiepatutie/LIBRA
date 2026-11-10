@@ -1,5 +1,5 @@
 import styles from "../../styles/adminPages/attendance.module.css"
-import QRScanner from "../../components/attendance/QRScanner.jsx"
+import QRScanner from "../../components/qr/QRScanner.jsx"
 
 import { useState, useEffect } from "react"
 

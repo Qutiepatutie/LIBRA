@@ -1,6 +1,6 @@
 import styles from "../../../styles/components/layout/header.module.css"
 
-import avatar from "../../../assets/profile-icon.png"
+import avatar from "../../../assets/id/profile-icon.png"
 
 import { useLocation } from "react-router-dom"
 import { getStorage } from "../../../pages/auth/auth.util.js"

@@ -2,7 +2,7 @@ import styles from "../../../styles/userPages/roomReservation/scanparticipants.m
 
 import { useState, useEffect} from "react";
 
-import QRScanner from "../../../components/attendance/QRScanner.jsx"
+import QRScanner from "../../../components/qr/QRScanner.jsx"
 import CustomButton from "../../../components/ui/CustomButton.jsx"
 
 import { reserveRoom } from "../../../api/rooms.js";
