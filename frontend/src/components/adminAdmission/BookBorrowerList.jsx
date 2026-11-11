@@ -3,7 +3,7 @@ import styles from "../../styles/adminPages/admission/borrowerlist.module.css"
 import BookPanel from "../library/BookPanel.jsx"
 import CustomButton from "../ui/CustomButton.jsx"
 
-export default function BookBorrowerList({ borrowers, returnBook, cancelBook, acceptBook, loading, category }) {
+export default function BookBorrowerList({ borrowers, cancelBook, loading, category, setConfirm, setBorrower }) {
 
     return (
         <div className={styles.list} >
@@ -43,14 +43,9 @@ export default function BookBorrowerList({ borrowers, returnBook, cancelBook, ac
                                         : "Return"
                                     }
                                     onClick={() => {
-                                        if(borrower.status !== "Pending") {
-                                            returnBook(borrower.book.id);
-                                        } else {
-                                            acceptBook(borrower.book.id);
-                                        }
+                                        setBorrower(borrower);
+                                        setConfirm(true);
                                     }}
-
-                                    action={loading ? "loading" : ""}
                                 />
                             </div>
                         </div>

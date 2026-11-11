@@ -6,11 +6,14 @@ import { useState } from "react";
 import { useBorrowers } from "../../../hooks/useBorrowers.js"
 import { SearchBar } from "../../../components/ui/Inputs.jsx";
 
+import ConfirmAdmission from "./ConfirmAdmission.jsx";
 import BookBorrowerList from "../../../components/adminAdmission/BookBorrowerList.jsx"
 import Toast from "../../../components/ui/Toast.jsx"
 
 export default function AdminBorrowers() {
     const [query, setQuery] = useState("");
+    const [confirm, setConfirm] = useState(false);
+    const [borrower, setBorrower] = useState({});
 
     const { pathname } = useLocation();
 
@@ -26,6 +29,7 @@ export default function AdminBorrowers() {
         searchBorrowers,
         toastMessage,
         showToast,
+        showToastFunc,
     } = useBorrowers();
     
     const params = {
@@ -44,10 +48,37 @@ export default function AdminBorrowers() {
     const displayedData = query
         ? searchBorrowers(param.data, query)
         : param.data;
+
+    function handleBorrower(idNum) {
+        if (!idNum) return;
+
+        if (borrower.user.id_number !== idNum) {
+            showToastFunc("ID doesn't match");
+            return;
+        }
+
+        if (borrower.status === "Pending") {
+            acceptBook(borrower.book.id);
+            
+        } else {
+            returnBook(borrower.book.id);
+        }
+
+        setConfirm(false);
+    }
     
     return (
         <>
             <Toast message={toastMessage} show={showToast} />
+
+            {confirm && (
+                <ConfirmAdmission
+                    loading={loading}
+                    setConfirm={setConfirm}
+                    handleBorrower={handleBorrower}
+                />
+            )}
+
             <div className={styles.bookBorrowers}>
                 <div className={styles.header}>
                     <SearchBar 
@@ -64,11 +95,11 @@ export default function AdminBorrowers() {
                 >
                     <BookBorrowerList
                         borrowers={displayedData}
-                        returnBook={returnBook}
                         cancelBook={cancelBook}
-                        acceptBook={acceptBook}
                         loading={loading}
                         category={param.category}
+                        setConfirm={setConfirm}
+                        setBorrower={setBorrower}
                     />
                 </div>
             </div>

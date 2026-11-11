@@ -190,7 +190,7 @@ export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBoo
                                                 : setIsEdit(true)
                                             }
     
-                                            setShowConfirm(true);
+                                            setShowConfirmBorrow(true);
                                         }}
                                     disabled={isBorrowed && role !== "admin"}
                                 />

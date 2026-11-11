@@ -155,6 +155,7 @@ export function useBorrowers() {
     return {
         toastMessage,
         showToast,
+        showToastFunc,
         loading,
         pendingBorrowers,
         currentBorrowers,
