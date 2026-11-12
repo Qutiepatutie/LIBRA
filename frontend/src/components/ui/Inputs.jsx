@@ -6,12 +6,13 @@ import openBook from "../../assets/auth/login/open-book-icon.svg"
 import closedBook from "../../assets/auth/login/closed-book-icon.svg"
 import searchIcon from "../../assets/search-icon.svg"
 
-export function TextInput({ label = "", value = "", name = "", placeholder = "", onChange, onBlur, disabled, isEmpty = false }) {
+export function TextInput({ label = "", value = "", name = "", placeholder = "", onChange, max = null,onBlur, disabled, isEmpty = false }) {
     return (
         <div className={styles.formInput} >
             {label && <label htmlFor={name}>{label}</label>}
             <input
                 type="text"
+                maxLength={max}
                 name={name}
                 value={value}
                 placeholder={placeholder}

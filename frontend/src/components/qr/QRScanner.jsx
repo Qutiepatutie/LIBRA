@@ -21,7 +21,6 @@ export default function QRScanner({ setData }) {
 
                     if (code) {
                         setData(code.data);
-                        console.log("code: ", code.data);
                     }
                }
           }
