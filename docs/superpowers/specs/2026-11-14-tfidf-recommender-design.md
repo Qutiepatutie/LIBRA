@@ -128,20 +128,38 @@ Control characters are stripped (one stand-in tag ends in `\u001e 0`; the contro
 
 ### 4.3 Author tokens
 
-1. Split multiple authors on `;`, `&` and the word ` and ` (to confirm once the school's format is known).
-2. Flip `Last, First` to `First Last`.
-3. Drop single-letter initials (`V.`).
-4. Lowercase, strip accents and punctuation, join words with `_`.
+1. Split multiple authors on `;`, `&` and the word ` and `. (The school's thesis file has none of these: one author per master's/doctoral record, and `Surname, et al.` for every undergraduate record. The books' format is still to confirm.)
+2. An author written as `Surname, et al.` gives **no token**: a lone surname cannot identify a person, and unrelated groups that share a surname would otherwise look similar.
+3. `Last, First` → `First Last`, using only the first two comma-separated parts; anything after the second comma (credentials such as `MD, FPCP`) is ignored.
+4. Drop single-letter initials (`V.`).
+5. Lowercase, strip accents and punctuation, join words with `_`.
 
-`"Alfred V. Aho"` and `"Aho, Alfred"` both give `alfred_aho`. The build keeps a token → display-name map (`alfred_aho` → `Alfred Aho`) for reason lines. A missing author gives no tokens.
+`"Alfred V. Aho"` and `"Aho, Alfred"` both give `alfred_aho`. The build keeps a token → display-name map (`alfred_aho` → `Alfred Aho`) for reason lines. A missing author gives no tokens. Because students usually write one thesis, `min_df=2` removes most thesis author tokens anyway; the rule matters mainly for books.
 
 ### 4.4 Theses and the Program column
 
 The school's thesis file has `BARCODE NO.`, `TITLE`, `AUTHOR`, `Program`, `COPYRIGHT`, `CALL NO.`, `Date Accessioned`. No description or tags.
 
-- The import puts **Program** into the thesis's `tags`, written out in full via `program_tag(code)`, e.g. `BSIT` → `Information Technology`. The code-to-name map (`PROGRAM_NAMES`) is filled from the school's official program list; an unknown code is kept as-is and logged.
+- The import puts the thesis's **program subject** into its `tags` via `program_subject(raw)`. The school writes programs as full names, not codes (51 distinct spellings in the sample), so the helper:
+  1. applies a small typo map built from the sample (`PROGRAM_FIXES`: `Infromation` → `Information`, `Masrer` → `Master`, `Infromation of Technology` → `Information Technology`, `Business in Administration` → `Business Administration`);
+  2. removes `Non-Thesis Track` and the leading degree words (`Bachelor/Master/Doctor`, `of Arts/Science/Philosophy … in`);
+  3. splits on `Major in`, `with Specialization in` and `Medyor sa`, keeping each subject.
+
+  Example: `Master of Arts in Education, Major in Educational Management` → tags `Education`, `Educational Management`.
 - `description` stays empty until abstracts are available; they are used automatically when filled.
 - Barcode and date accessioned are copy-level (BookCopy). COPYRIGHT → `year_published`, CALL NO. → `call_number`.
+
+**What the school's sample contains** (`[FOR BS CS] LAGUNA THESIS AND DISSERTATION.xlsx`, profiled 2026-11-14):
+
+| Sheet | Records | Notes |
+|---|---|---|
+| MASTER | 214 | 3 titles appear twice (2 copies, same call number, different barcodes); barcode `LRC-VI-A-MT-168` is used for two different theses (data error to report) |
+| DOCTOR | 23 | 2 records carry `MT` call numbers |
+| THESIS (undergraduate) | 40 | 38 Pharmacy, 2 Psychology; authors are `Surname, et al.` |
+
+Import notes for the BookCopy/import work: the sheets contain many numbered empty rows; COPYRIGHT and Date Accessioned are Excel date serials in MASTER and DOCTOR (e.g. `43891` = 2020-03-01) but plain years in THESIS, and one value is `Hunyo 2023`. Despite the file name, there are no BS CS theses (one Master of Science in Computer Science, eleven Master in Information Technology).
+
+**Title-only check (throwaway spike, pure-Python re-implementation of the same formulas on the 273 distinct works):** with title + program subject, every thesis has at least one match at τ up to 0.20 and 96% still do at 0.30. Thesis documents are short, so one or two shared words give high scores; thesis scores will run higher than book scores (books have long descriptions). Sample matches were topical for Pharmacy and Psychology; the main false links came from place names and broad program words such as "administration".
 
 ### 4.5 Same-work key and representatives
 
@@ -154,11 +172,14 @@ The school's thesis file has `BARCODE NO.`, `TITLE`, `AUTHOR`, `Program`, `COPYR
 
 ### 4.7 Stop words
 
-`STOP_WORDS = ENGLISH_STOP_WORDS ∪ LIBRARY_WORDS ∪ FILIPINO_WORDS ∪ THESIS_TITLE_WORDS`
+`STOP_WORDS = ENGLISH_STOP_WORDS ∪ LIBRARY_WORDS ∪ FILIPINO_WORDS ∪ THESIS_TITLE_WORDS ∪ PLACE_WORDS`
 
 - `LIBRARY_WORDS` (starting list, team-maintained): study, research, researchers, respondents, thesis, chapter, book, edition.
 - `FILIPINO_WORDS`: ang, ng, sa, mga, na, at, ay, ito, para, kung, si, ni, kay, nang, pa.
-- `THESIS_TITLE_WORDS`: chosen from a word count of the real thesis titles (candidates: development, implementation, assessment, effectiveness, based, among). Recorded with the counts that justified them.
+- `THESIS_TITLE_WORDS`: generic research-title words, from the word count of the 277 sample titles (number of titles containing each): selected 18, level 19, basis 18, evaluation 22, assessment 15, determination 13, implementation 12, development 16, impact 14, based 13, iii 15. ("among" is already in the English list.) The team confirms the final list; topical words such as feasibility, antioxidant and satisfaction stay.
+- `PLACE_WORDS`: Philippine place words that describe where a study was done, not what it is about (city 48, pampanga 27, bulacan 16, angeles 13, san 14, marilao 10, region 17, province 11, district 11, plus others found in the titles such as caloocan). The team completes the list from the title word count. Justification for the paper: locale is not topic, and two unrelated studies in the same city should not look similar.
+
+Each list keeps its counts in a comment so the paper's stop-word table can cite them.
 
 The English list removes some real words (e.g. "system"); this is accepted because nearly every IT capstone title contains "system".
 
@@ -302,7 +323,7 @@ Designer handoff note (delivered with the plain version): card fields, the four 
 ### Tool 2: `evaluate_recommender --key <key.csv> --sheet <a.csv> [--sheet <b.csv> ...] [--tau <value>]`
 
 - Combine sheets by majority vote per pair; a tie counts as not good. A blank answer is treated as no vote.
-- **Group A:** score-band table in 0.05-wide bands (pairs, good, % good) and the suggested τ = lowest band with ≥ 70% good.
+- **Group A:** score-band table in 0.05-wide bands (pairs, good, % good) and the suggested τ = lowest band with ≥ 70% good, reported for all pairs and separately by the viewed item's type (book, thesis). Thesis scores run higher than book scores (section 4.4), so if the two suggestions differ by more than one band the team may use a separate threshold for theses (`RECOMMENDER_MIN_SCORE_THESIS`, falling back to `RECOMMENDER_MIN_SCORE` when unset). This is decided after the first judging round.
 - **Group B, at the given τ (or the suggestion):** per item, cards = candidates with score ≥ τ, top 4; precision = good ÷ shown; items with no cards are excluded from the mean. Report mean precision@4 and the number of items it covers. Availability is ignored.
 - **Coverage:** over all non-archived items in `Books` (including items with no saved rows), the share with at least one saved candidate ≥ τ.
 - **Histogram data:** CSV of every item's top-4 scores.
@@ -338,7 +359,7 @@ Judging sheets contain student thesis authors' names. They are written only outs
 
 Backend tests need Postgres (the SQLite test settings are broken by `RoomReservation`'s `ArrayField`; the advisory lock also needs Postgres). Use the throwaway local Postgres set up for this project.
 
-1. **Preprocessing unit tests:** each placeholder, tag rule and author rule with real stand-in examples; work keys for `Calculus, 11th ed.` vs `Calculus (10th edition)`; `program_tag` known and unknown codes; document assembly with empty fields.
+1. **Preprocessing unit tests:** each placeholder, tag rule and author rule with real stand-in examples; work keys for `Calculus, 11th ed.` vs `Calculus (10th edition)`; `program_subject` on real sample spellings (typo fixes, `Non-Thesis Track`, `Major in`, `Medyor sa`); `Quilantang, et al.` gives no author token; `Daluyong, Mirasol T. Abrenica, MD, FPCP` ignores the credentials; document assembly with empty fields.
 2. **Hand-calculation test:** a 3-document toy corpus; expected TF, IDF, normalized weights and cosine computed in the test from the Chapter 3 formulas; the build's score matches within 1e-9.
 3. **Build tests** on a small fixture catalog (two editions of one work, an archived item, a thesis with a Program tag, a `None` description, an item with no shared terms): no self or same-work pairs; archived excluded; ≤ 12 per item; rank order; contributions of all shared terms sum to the score; two builds identical; empty catalog does not raise; IDF counts a work once.
 4. **API tests:** 401 without login; 400/404 cases; τ filter; max 4; `all_out` with an open loan; lost/damaged hidden; archived candidate dropped; `score` present for admins and absent for students; empty list.
@@ -376,10 +397,11 @@ Backend tests need Postgres (the SQLite test settings are broken by `RoomReserva
 
 | Item | Owner | Needed for |
 |---|---|---|
-| Author separator format in the school's data | data preparer | author-token split rule |
+| Author separator format in the books data (thesis format resolved: single author or `Surname, et al.`) | data preparer | author-token split rule |
 | Abstracts for theses (any subset) | school / LRC | thesis quality (optional) |
-| Official program code list | school | `PROGRAM_NAMES` |
-| Thesis-title stop words from real word counts | team | `THESIS_TITLE_WORDS` |
+| Duplicate barcode `LRC-VI-A-MT-168` (two different theses) | school / LRC | thesis import |
+| Confirm `THESIS_TITLE_WORDS` and complete `PLACE_WORDS` from the title word count | team | stop-word lists |
+| Single τ or separate thesis τ | team, after first judging | `RECOMMENDER_MIN_SCORE_THESIS` |
 | Designer sign-off on the plain row | designer | merging the UI part |
 | BookCopy spec and thesis import | team | availability switch; thesis data load (`publisher` and `pages` are required fields today) |
 | Render instance memory (scikit-learn adds ~100 MB) | team | deploy; fallback is building off-server with the same table |
