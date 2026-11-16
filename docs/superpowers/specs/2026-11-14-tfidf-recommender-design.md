@@ -1,7 +1,7 @@
 # LIBRA "Books to recommend": TF-IDF + Cosine Similarity Recommender — Design
 
 - **Date:** 2026-11-14
-- **Status:** Design approved section by section; awaiting spec review
+- **Status:** Approved 2026-11-16; next step is the implementation plan
 - **Branch:** `feat/tfidf-recommender`
 - **Source:** brainstorm record `LIBRA-TFIDF-Recommender-Brainstorm.pdf` (2026-11-10) plus the follow-up design session (2026-11-11 to 2026-11-14)
 
