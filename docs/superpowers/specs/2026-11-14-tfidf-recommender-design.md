@@ -406,3 +406,19 @@ Backend tests need Postgres (the SQLite test settings are broken by `RoomReserva
 | BookCopy spec and thesis import | team | availability switch; thesis data load (`publisher` and `pages` are required fields today) |
 | Render instance memory (scikit-learn adds ~100 MB) | team | deploy; fallback is building off-server with the same table |
 | First τ from team judging on stand-in data | team | replaces the 0.10 default |
+
+## 15. Amendments (2026-11-17): BookCopy now exists
+
+The BookCopy split was built after this spec was approved (PR #15, branch `feat/book-copy`, spec `2026-11-16-book-copy-design.md`). The recommender is implemented on top of it. Where this section differs from sections 1–14, this section wins.
+
+| Topic | Earlier text | Now |
+|---|---|---|
+| Base branch | `main` | `feat/book-copy` (or `main` once PR #15 is merged) |
+| Endpoint path | `/library/getRecommendations/` | `GET /getRecommendations/?book_id=<id>` (library URLs are mounted at the root) |
+| Migration | `0014_bookrecommendation.py` | the next free number after BookCopy's migrations (`0017` on `feat/book-copy`) |
+| Availability | `availability_for(ids)` in `serve.py`, from `Books.condition` | `title_availability(book_ids)` in `library/copies.py`, from copies: `available` = at least one available copy; `all_out` = at least one non-archived good copy but none available; `hidden` = no non-archived good copy |
+| `book` payload | `BooksSerializer` | unchanged, and now includes `total_copies`, `available_copies` and `copies`, built by a shared `catalog_books()` helper in `copies.py` |
+| Rebuild triggers | condition edits listed as "no rebuild" on `edit_book` | condition is a copy field (`editCopy/`); no copy endpoint triggers a rebuild |
+| `seed_data.py` | calls the rebuild at the end | the script is git-ignored and local, so it is not changed; run `python manage.py rebuild_recommendations` after seeding |
+| τ suggestion | lowest band with ≥ 70% judged good | same, but a band needs at least 5 judged pairs to be eligible, so one lucky pair cannot set τ |
+| Judging sample | 30 non-archived items | 30 non-archived items that have at least one saved candidate (an item with none has nothing to judge) |
