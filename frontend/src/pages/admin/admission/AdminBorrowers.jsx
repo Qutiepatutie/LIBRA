@@ -58,10 +58,10 @@ export default function AdminBorrowers() {
         }
 
         if (borrower.status === "Pending") {
-            acceptBook(borrower.book.id);
+            acceptBook(borrower.id);
             
         } else {
-            returnBook(borrower.book.id);
+            returnBook(borrower.id);
         }
 
         setConfirm(false);

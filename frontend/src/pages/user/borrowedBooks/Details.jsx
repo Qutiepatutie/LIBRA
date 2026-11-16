@@ -19,7 +19,8 @@ export default function Details({ setShowDetails, book, userBorrowedBooks, setUs
         setUserBorrowedBooks(
             userBorrowedBooks
                 .filter(borrowedBook =>
-                    borrowedBook.book.id !== book.id));
+                    borrowedBook.id !== book.id));
+        // book is the title merged with the loan, so book.id is the loan id here.
         cancelBook(book.id);
     }
 

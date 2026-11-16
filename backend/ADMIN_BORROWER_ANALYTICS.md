@@ -23,7 +23,7 @@ tab has (`BorrowersQuerySerializer`). What each one does here:
 | --- | --- | --- | --- |
 | `range` | `day`, `week`, `semester`, `year` | `week` | Window for every card and chart. |
 | `role` | `student`, `faculty`, `all` | `student` | Which accounts are counted: active `student`, active `faculty`, or both. Sets the population for every card and chart. |
-| `item_type` | `all`, `book`, `thesis` | `all` | Filters **loans** by `Books.item_type`. The population, and so `registered_borrowers`, is unchanged. |
+| `item_type` | `all`, `book`, `thesis` | `all` | Filters **loans** by the title's `Books.item_type` (via the loaned copy). The population, and so `registered_borrowers`, is unchanged. |
 | `program` | `UserProfile.program` string, repeatable | all | Filters the **counted borrowers** (and therefore their loans), whatever their role. `All` is ignored. |
 | `academic_year` | e.g. `2026-2027` | current | Selects the term (with `semester`). `All` is ignored. |
 | `semester` | `AcademicTerm.semester`, e.g. `1`, `2` | current | Selects the term. `All` is ignored. |

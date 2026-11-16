@@ -8,6 +8,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 
 from accounts.models import EducationLevel, RoleChoices, UserLogin, UserProfile
 from .models import AcademicTerm, AcademicYear, Books, BorrowRecords, ItemType, StatusChoices
+from .test_admin_analytics import add_copy, copy_for
 from .tests import MANILA, NOW
 
 
@@ -57,13 +58,17 @@ class BorrowersDashboardTests(TestCase):
                                           education_level=education_level, year_level='1')
 
     def make_book(self, call_number, item_type=ItemType.BOOK):
-        return Books.objects.create(call_number=call_number, title=f'Book {call_number}', author='Author',
+        book = Books.objects.create(call_number=call_number, title=f'Book {call_number}', author='Author',
                                     publisher='Publisher', year_published='2026', pages='100', item_type=item_type)
+        add_copy(book)
+        return book
 
     def loan(self, profile, borrowed, returned=None, status=StatusChoices.ACTIVE, book=None):
+        status = StatusChoices.RETURNED if returned else status
+        # One open loan per copy: simultaneous loans of the same title take further copies.
         return BorrowRecords.objects.create(
-            user=profile, book=book or self.book, borrow_date=borrowed, due_date=borrowed.date() + timedelta(days=7),
-            return_date=returned, status=StatusChoices.RETURNED if returned else status,
+            user=profile, copy=copy_for(book or self.book, status), borrow_date=borrowed, due_date=borrowed.date() + timedelta(days=7),
+            return_date=returned, status=status,
         )
 
     def term(self, **changes):

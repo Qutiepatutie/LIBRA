@@ -62,9 +62,9 @@ export function useBorrowers() {
         });
     }
 
-    async function returnBook(bookId) {
+    async function returnBook(loanId) {
         setLoading(true);
-        const resp = await returnBookUtil(bookId);
+        const resp = await returnBookUtil(loanId);
         setLoading(false);
             
         showToastFunc(resp.message);
@@ -72,13 +72,13 @@ export function useBorrowers() {
         if(resp.status !== 200) { return; }
 
         setAllBorrowers(borrowers => 
-            borrowers.filter(b => b.book.id !== bookId)
+            borrowers.filter(b => b.id !== loanId)
         );
     }
     
-    async function cancelBook(bookId) {
+    async function cancelBook(loanId) {
         setLoading(true);
-        const resp = await cancelBorrowedBook(bookId);
+        const resp = await cancelBorrowedBook(loanId);
         setLoading(false);
             
         showToastFunc(resp.message);
@@ -86,13 +86,13 @@ export function useBorrowers() {
         if(resp.status !== 200) { return; }
 
         setAllBorrowers(borrowers => 
-            borrowers.filter(b => b.book.id !== bookId)
+            borrowers.filter(b => b.id !== loanId)
         );
     }
 
-    async function acceptBook(bookId) {
+    async function acceptBook(loanId) {
         setLoading(true);
-        const resp = await acceptBorrowedBook(bookId);
+        const resp = await acceptBorrowedBook(loanId);
         setLoading(false);
         console.log(resp);
 
@@ -103,7 +103,7 @@ export function useBorrowers() {
 
         setAllBorrowers(borrowers => 
             borrowers.map(b => 
-                b.book.id === bookId
+                b.id === loanId
                 && b.status === "Pending"
                 ? {
                     ...b,

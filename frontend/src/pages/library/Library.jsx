@@ -18,7 +18,8 @@ export default function Library() {
     const { books,
             searchedBooks,
             updateBook,
-            searchBooks } = useLibraryBooks();
+            searchBooks,
+            fetchBooks } = useLibraryBooks();
     
     const { allBorrowers, setAllBorrowers } = useBorrowers();
 
@@ -30,6 +31,11 @@ export default function Library() {
 
     const [activeBook, setActiveBook] = useState("");
     const [showBook, setShowBook] = useState(false);
+
+    // Latest copy of the open title, so copy counts refresh after fetchBooks.
+    const liveBook = (activeBook
+        && Object.values(books).flat().find(b => b.id === activeBook.id))
+        || activeBook;
 
     const handleUpdateBook = (updatedBook) => {
         updateBook(updatedBook, activeBook);
@@ -115,8 +121,9 @@ export default function Library() {
                 {showBook && (
                     <ShowBook 
                         setShowBook={setShowBook}
-                        currBook={activeBook}
+                        currBook={liveBook}
                         onConfirmEdit={handleUpdateBook}
+                        refreshBooks={fetchBooks}
                         allBorrowers={allBorrowers}
                         setAllBorrowers={setAllBorrowers}
                     />

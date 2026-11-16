@@ -11,7 +11,7 @@ old `/adminAnalyticsDashboard/` trusted a spoofable `?id_number=`; it was remove
 | Param | Values | Default | Effect |
 | --- | --- | --- | --- |
 | `range` | `day`, `week`, `semester`, `year` | `week` | Window for the cards, line chart and top 10. |
-| `item_type` | `all`, `book`, `thesis` | `all` | Filters loans by `Books.item_type`. |
+| `item_type` | `all`, `book`, `thesis` | `all` | Filters loans by the title's `Books.item_type` (via the loaned copy). |
 | `program` | `UserProfile.program` string, repeatable | all | `?program=BS Nursing&program=BS Pharmacy` groups a college. `All` is ignored. |
 | `academic_year` | e.g. `2026-2027` | current | Selects the term (with `semester`). `All` is ignored. |
 | `semester` | `AcademicTerm.semester`, e.g. `1`, `2` | current | Selects the term. |
@@ -75,8 +75,9 @@ otherwise the term running today gives `active`, else `no_active_term` /
   date today vs. 7 days ago, derived from dates rather than stored status. The
   overdue card ignores `range` but honours `item_type` and `program`. The semester
   timeline card reads `academic_term`.
-- **Top 10**: ranked by checkouts in the window, grouped by title + author so copies
-  rank together. Both lists ship in one response so the Books/Thesis toggle is
+- **Top 10**: ranked by checkouts in the window, grouped by title (the `Books` row), so
+  every copy of a title ranks together while two different titles that share a name
+  stay separate. Both lists ship in one response so the Books/Thesis toggle is
   client-side.
 - **Peak borrowing periods**: one grid per term of the resolved academic year (or the
   latest configured one), so the 1st Sem / 2nd Sem / Summer buttons are client-side.

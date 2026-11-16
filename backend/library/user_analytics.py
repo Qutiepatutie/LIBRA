@@ -103,8 +103,8 @@ def borrowing_frequency(loans, today):
 def borrowed_subjects(loans):
     counts = Counter()
     # Aggregate per catalog call number in SQL instead of loading every loan.
-    for row in loans.values('book__call_number').annotate(count=Count('pk')).order_by():
-        prefix = re.match(r'^\s*([0-9]{3})(?![0-9])', row['book__call_number'])
+    for row in loans.values('copy__book__call_number').annotate(count=Count('pk')).order_by():
+        prefix = re.match(r'^\s*([0-9]{3})(?![0-9])', row['copy__book__call_number'])
         subject = SUBJECTS[int(prefix[1]) // 100] if prefix else ('unclassified', 'Unclassified')
         counts[subject] += row['count']
     ranked = sorted(counts.items(), key=lambda item: (-item[1], item[0][0]))

@@ -4,7 +4,8 @@ from django.urls import reverse
 from rest_framework_simplejwt.tokens import AccessToken
 
 from accounts.models import EducationLevel, RoleChoices, UserLogin, UserProfile
-from .models import AcademicTerm, AcademicYear, Books, ItemType, StatusChoices
+from .copies import HOLD_STATUSES, next_copy_number
+from .models import AcademicTerm, AcademicYear, BookCopy, Books, BorrowRecords, ItemType, StatusChoices
 from .tests import MANILA, NOW, DashboardTestCase
 
 
@@ -12,7 +13,40 @@ def at(day, hour=10):
     return datetime(day.year, day.month, day.day, hour, tzinfo=MANILA)
 
 
-class CirculationDashboardTests(DashboardTestCase):
+def add_copy(book, **changes):
+    return BookCopy.objects.create(book=book, copy_number=next_copy_number(book), **changes)
+
+
+def copy_for(book, status):
+    """A copy of the title that can take this loan: one open loan per copy, so open loans get a free copy."""
+    copies = book.copies.order_by('copy_number')
+    if status in HOLD_STATUSES:
+        return next((copy for copy in copies if not copy.loans.filter(status__in=HOLD_STATUSES).exists()),
+                    None) or add_copy(book)
+    return copies.first() or add_copy(book)
+
+
+class CopyFixtures:
+    """Titles with copy 1, and loans on copies; shared by the analytics test cases (listed before DashboardTestCase)."""
+
+    def make_book(self, call_number, **changes):
+        values = dict(call_number=call_number, title=f'Book {call_number}', author='Author',
+                      publisher='Publisher', year_published='2026', pages='100')
+        book = Books.objects.create(**{**values, **changes})
+        add_copy(book)
+        return book
+
+    def loan(self, **changes):
+        values = dict(user=self.profile, borrow_date=NOW - timedelta(days=2),
+                      due_date=date(2026, 10, 10), status=StatusChoices.ACTIVE)
+        values.update(changes)
+        if 'copy' not in values:
+            values['copy'] = copy_for(values.pop('book', self.book), values['status'])
+        values.pop('book', None)
+        return BorrowRecords.objects.create(**values)
+
+
+class CirculationDashboardTests(CopyFixtures, DashboardTestCase):
     # NOW is Wednesday 2026-10-07 12:00 in Manila; this week runs Mon 10-05 to Sun 10-11.
 
     def setUp(self):
@@ -27,13 +61,6 @@ class CirculationDashboardTests(DashboardTestCase):
         response = self.client.get(reverse('get_circulation_dashboard'), params)
         self.assertEqual(response.status_code, 200, response.data)
         return response.data
-
-    def make_book(self, call_number, **changes):
-        book = super().make_book(call_number)
-        for field, value in changes.items():
-            setattr(book, field, value)
-        book.save()
-        return book
 
     def test_requires_jwt_admin_role(self):
         self.client.force_authenticate(None)
@@ -109,16 +136,22 @@ class CirculationDashboardTests(DashboardTestCase):
                          {'value': 2, 'week_ago': 2, 'change': 0})
 
     def test_top_borrowed_groups_copies_and_splits_item_types(self):
-        copy = self.make_book('600.T932 1991 c.2', title=self.book.title)
+        second = add_copy(self.book)
         thesis = self.make_book('T-001', item_type=ItemType.THESIS, title='Capstone')
-        for book in (self.book, copy, thesis):
-            self.loan(borrow_date=at(date(2026, 10, 6)), book=book)
+        for copy in (self.book.copies.get(copy_number=1), second, thesis.copies.get()):
+            self.loan(borrow_date=at(date(2026, 10, 6)), copy=copy)
         for index in range(11):
             self.loan(borrow_date=at(date(2026, 10, 5)), book=self.make_book(f'900.{index:02d}'))
         top = self.dashboard()['top_borrowed']
         self.assertEqual(len(top['book']), 10)
         self.assertEqual(top['book'][0], {'title': self.book.title, 'author': 'Author', 'count': 2})
         self.assertEqual(top['thesis'], [{'title': 'Capstone', 'author': 'Author', 'count': 1}])
+
+    def test_top_borrowed_keeps_distinct_titles_with_the_same_name_apart(self):
+        twin = self.make_book('600.TWIN', title=self.book.title)
+        self.loan(borrow_date=at(date(2026, 10, 6)))
+        self.loan(borrow_date=at(date(2026, 10, 6)), book=twin)
+        self.assertEqual([row['count'] for row in self.dashboard()['top_borrowed']['book']], [1, 1])
 
     def test_semester_without_calendar_has_no_period(self):
         self.loan()

@@ -9,8 +9,8 @@ export default function BookBorrowerList({ borrowers, cancelBook, loading, categ
         <div className={styles.list} >
             {borrowers.length === 0
                 ? <p className={styles.noBorrowers}>No {category} Borrowers</p>
-                : borrowers.map((borrower, index) => (
-                    <div key={index} className={styles.panel}>
+                : borrowers.map((borrower) => (
+                    <div key={borrower.id} className={styles.panel}>
                         <div className={styles.itemContainer}>
                             <BookPanel
                                 book={borrower.book}
@@ -20,6 +20,9 @@ export default function BookBorrowerList({ borrowers, cancelBook, loading, categ
                         <div className={styles.borrowerInfo}>
                             <p>{borrower.user.first_name} {borrower.user.last_name}</p>
                             <p>ID: {borrower.user.id_number}</p>
+                            {borrower.copy &&
+                                <p>c.{borrower.copy.copy_number}{borrower.copy.accession_number ? ` (${borrower.copy.accession_number})` : ""}</p>
+                            }
                             {borrower.due_date &&
                                 <p>Due: {borrower.due_date}</p>
                             }
@@ -31,7 +34,7 @@ export default function BookBorrowerList({ borrowers, cancelBook, loading, categ
                                     <CustomButton
                                         value="X"
                                         action="clear"
-                                        onClick={() => cancelBook(borrower.book.id)}
+                                        onClick={() => cancelBook(borrower.id)}
                                         disabled={loading}
                                     />
                                 </div>

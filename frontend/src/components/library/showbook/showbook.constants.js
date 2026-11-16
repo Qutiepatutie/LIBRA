@@ -1,3 +1,5 @@
+export const CONDITIONS = ["good", "damaged", "lost"];
+
 export const details = {
     description: "",
     call_number: "Call Number",

@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import CustomButton from "../../ui/CustomButton.jsx";
 import BookInfos from "./BookInfos.jsx";
 
-import { details } from "./showbook.constants.js"
+import { CONDITIONS, details } from "./showbook.constants.js"
 import { useUpdateBook } from "./useUpdateBook.js";
 import { getStorage } from "../../../pages/auth/auth.util.js";
 
@@ -18,7 +18,7 @@ import ConfirmRemovePanel from "./ConfirmRemovePanel.jsx";
 // Statuses that hold an item; the backend refuses a new borrow for any of them.
 const OPEN_LOAN_STATUSES = ["Pending", "Active", "Due", "Overdue"];
 
-export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBook, allBorrowers, setAllBorrowers }){
+export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBook, allBorrowers, setAllBorrowers, refreshBooks }){
     const role = getStorage().getItem("role");
 
     const notify = () => {
@@ -41,18 +41,26 @@ export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBoo
         borrowBook,
         editBook,
         removeBook,
+        addCopy,
+        editCopy,
+        removeCopy,
     } = useUpdateBook(setShowConfirmBorrow, setShowConfirmRemove, notify);
 
-    // Match on the item id: theses often have no ISBN, so many items share a blank one.
-    const isBorrowed = allBorrowers.find(
-        b => OPEN_LOAN_STATUSES.includes(b.status) && b.book.id === currBook.id
+    // The user already holds a request or loan on some copy of this title.
+    const alreadyRequested = allBorrowers.some(
+        b => OPEN_LOAN_STATUSES.includes(b.status)
+            && b.book.id === currBook.id
+            && b.user?.id_number === getStorage().getItem("id_number")
     );
+
+    const noCopies = currBook.available_copies === 0;
+    const isBorrowed = alreadyRequested || noCopies;
 
     const isAdmin = role === "admin";
 
     const buttonLabel = isAdmin
         ? (isEdit ? "Submit" : "Edit Book")
-        : (isBorrowed ? "Borrowed" : "Borrow Book");
+        : (alreadyRequested ? "Borrowed" : noCopies ? "Unavailable" : "Borrow Book");
 
     useEffect(() => {
         const handleEsc = (e) => {
@@ -79,6 +87,7 @@ export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBoo
 
         const isUnchanged = Object
             .keys(bookDetails)
+            .filter(key => !["copies", "total_copies", "available_copies"].includes(key))
             .every(key => bookDetails[key] === currBook[key]);
 
         if(isUnchanged){
@@ -95,16 +104,37 @@ export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBoo
         setIsEdit(false);
     }
 
-    const handleConfirmBorrow = (book) => {
-        borrowBook(book);
+    const handleConfirmBorrow = async (book) => {
+        const resp = await borrowBook(book);
 
-        setAllBorrowers(prev =>
-            prev.map(b =>
-                b.book.id === book.id
-                    ? {...b, status: "Pending"}
-                    : b
-            )
-        );
+        if(resp?.status !== 200) return;
+
+        setAllBorrowers(prev => [
+            ...prev,
+            {
+                id: resp.loan_id,
+                status: "Pending",
+                book,
+                copy: resp.copy,
+                user: { id_number: getStorage().getItem("id_number") },
+            }
+        ]);
+        refreshBooks();
+    }
+
+    const handleEditCopy = async (copy, changes) => {
+        const resp = await editCopy({ copy_id: copy.id, ...changes });
+        if(resp.status === 200) refreshBooks();
+    }
+
+    const handleAddCopy = async () => {
+        const resp = await addCopy({ book_id: currBook.id });
+        if(resp.status === 201) refreshBooks();
+    }
+
+    const handleRemoveCopy = async (copy) => {
+        const resp = await removeCopy({ copy_id: copy.id });
+        if(resp.status === 200) refreshBooks();
     }
 
     const handleRemoveBook = () => {
@@ -162,6 +192,41 @@ export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBoo
                             />
                         </div>
 
+                        <div className={styles.copies}>
+                            <p>{currBook.available_copies} of {currBook.total_copies} copies available</p>
+                            {isAdmin && (
+                                <>
+                                    {currBook.copies?.map(copy => (
+                                        <div key={copy.id} className={styles.copy}>
+                                            <span>
+                                                c.{copy.copy_number}
+                                                {copy.accession_number && ` (${copy.accession_number})`}
+                                            </span>
+                                            <select
+                                                value={copy.condition}
+                                                disabled={loading}
+                                                onChange={(e) => handleEditCopy(copy, { condition: e.target.value })}
+                                            >
+                                                {CONDITIONS.map(c => (
+                                                    <option key={c} value={c}>{c}</option>
+                                                ))}
+                                            </select>
+                                            <button
+                                                type="button"
+                                                disabled={loading}
+                                                onClick={() => handleRemoveCopy(copy)}
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button type="button" disabled={loading} onClick={handleAddCopy}>
+                                        Add copy
+                                    </button>
+                                </>
+                            )}
+                        </div>
+
                         <div className={styles.buttonContainer}>
                             {role === "admin" && (
                                 <div className={styles.deleteButton}>
@@ -192,7 +257,7 @@ export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBoo
     
                                             setShowConfirmBorrow(true);
                                         }}
-                                    disabled={isBorrowed && role !== "admin"}
+                                    disabled={isBorrowed && !isAdmin}
                                 />
                             </div>
                         </div>

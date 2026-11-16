@@ -92,7 +92,7 @@ The redesign supersedes the older chart descriptions in `analytics_user.md`:
 borrowing frequency is monthly, and most borrowed subjects ranks lifetime
 checkouts by broad Dewey class. The API returns the top five classes plus
 `Other` if necessary, with ties ordered by code. It reads the leading three
-digits of a call number (`600.T932` maps to Technology). `000–099` uses display
+digits of the title's call number (reached through the loaned copy) (`600.T932` maps to Technology). `000–099` uses display
 code `001`, matching the design. Non-numeric or prefixed call numbers go to
 `Unclassified`; they are never silently dropped. Percentages use all eligible
 checkouts as the denominator and are rounded to two decimals.

@@ -30,12 +30,15 @@ tab endpoint replaces the frequency helper, and this endpoint replaces
     "lost_damaged": {"value": 17, "percentage": 0.4}
   },
   "overdue_items": [{"loan_id": 7, "borrower_id": "2023-0142", "borrower": "Ana Cruz",
-                     "title": "Operating System Concepts", "call_number": "005.43 S5",
+                     "title": "Operating System Concepts", "call_number": "005.43 S5", "copy_number": 2, "accession_number": "A-00123",
                      "due_date": "2026-09-12", "days_overdue": 25}]
 }
 ```
 
-- Each copy (`Books` row) counts in exactly one of `available`, `borrowed` or
+- A copy is one physical item (`BookCopy` row); a title (`Books` row) can have many.
+  `total_copies` counts copies with `is_archived=False` whose title is also not archived,
+  so withdrawn copies and archived titles are left out of every card.
+- Each copy counts in exactly one of `available`, `borrowed` or
   `lost_damaged`, so the three add up to `total_copies`.
   - `borrowed`: good copies on an open checkout (Active/Due/Overdue with no
     `return_date`).
@@ -46,10 +49,11 @@ tab endpoint replaces the frequency helper, and this endpoint replaces
   split.
 - `percentage` is a share of `total_copies`, and is `null` when the collection is
   empty.
-- `overdue_items` lists every overdue loan (no cap), most days overdue first. Dates
-  use `LIBRARY_TIME_ZONE` (Asia/Manila).
+- `overdue_items` lists every overdue loan (no cap), most days overdue first. Each item
+  names its copy with `copy_number` and `accession_number` (blank when the library has
+  not supplied a barcode). Dates use `LIBRARY_TIME_ZONE` (Asia/Manila).
 
-## `Books.condition`
+## `BookCopy.condition`
 
 | Value | Meaning |
 | --- | --- |
@@ -57,9 +61,10 @@ tab endpoint replaces the frequency helper, and this endpoint replaces
 | `lost` | Missing; left out of `available` and `borrowed` |
 | `damaged` | Out of circulation until repaired |
 
-Migration `0011_books_condition` adds it with a default, so existing rows become
-`good`. `getBooks/` returns it and `addBook/` accepts it. `editBook/` accepts
-`condition` (and `itemType`), and an unknown value returns `400`.
+Condition lives on the copy, not the title (it moved off `Books` in the BookCopy split;
+existing rows became copy 1 of their title with the same condition). `getBooks/` lists
+each title's copies with their condition, `addBook/` and `addCopy/` accept it, and
+`editCopy/` changes it; an unknown value returns `400`. `editBook/` ignores `condition`.
 
 ## Deploy notes
 
