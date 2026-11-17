@@ -69,6 +69,7 @@ export function useAddBook() {
                 .filter(key => ![
                                 "isbn",
                                 "classification",
+                                "accession_number",
                                 "call_number",
                                 "cover_url",
                             ].includes(key))

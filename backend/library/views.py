@@ -5,7 +5,8 @@ from django.views.decorators.csrf import csrf_exempt
 from .permissions import IsAdminRole
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
-from django.db.models import F
+from django.db import IntegrityError, transaction
+from django.db.models import Exists, F, OuterRef, Prefetch
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -14,15 +15,40 @@ from rest_framework import status
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 
-from .models import Books, BorrowRecords, UserProfile, RoomReservation, StatusChoices, ItemType, ConditionChoices
+from .models import BookCopy, Books, BorrowRecords, UserProfile, RoomReservation, StatusChoices, ItemType
 from .serializers import AllBorrowRecordSerializer, UserBorrowRecordSerializer, BooksSerializer, AddBooksSerializer, RoomReservationSerializer
+from .serializers import CopyFieldsSerializer, CopyRefSerializer, CopySerializer
 from .serializers import DashboardLoanSerializer, DashboardPageQuerySerializer, CirculationQuerySerializer, BorrowersQuerySerializer
+from .copies import HOLD_STATUSES, assign_copy, available_copies, next_copy_number, with_copy_counts
 from . import admin_analytics, inventory_analytics, borrower_analytics, user_analytics
+
+COPY_FIELDS = ("accession_number", "condition", "date_acquired")
+
+def with_availability(copies_qs):
+    """Annotate is_available from the single rule in copies.py, so listing copies costs no query per copy."""
+    return copies_qs.annotate(is_available=Exists(available_copies().filter(pk=OuterRef("pk"))))
+
+def _copy_payload(copy):
+    return CopySerializer(with_availability(BookCopy.objects.filter(pk=copy.pk)).get()).data
+
+def _copy_fields(request):
+    # A null means "not given", so the model default applies instead of "Invalid condition".
+    return {field: request.data[field] for field in COPY_FIELDS if request.data.get(field) is not None}
+
+def _first_error(serializer):
+    first_errors = next(iter(serializer.errors.values()))
+    return Response({"message": first_errors[0], "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+def _accession_taken():
+    return Response({"message": "Accession number already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_books(request):
-    books = Books.objects.filter(is_archived=False)
+    listed = with_availability(BookCopy.objects.filter(is_archived=False)).order_by("copy_number")
+    books = with_copy_counts(Books.objects.filter(is_archived=False)).prefetch_related(
+        Prefetch("copies", queryset=listed, to_attr="listed_copies"),
+    )
 
     serializer = BooksSerializer(books, many=True)
     return Response({"data": serializer.data}, status=status.HTTP_200_OK)
@@ -38,31 +64,46 @@ def add_books(request):
     # ISBN is optional for theses; AddBooksSerializer requires it for books.
     if not all([call_number, title, author]):
         return Response({'message': 'Missing important fields'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
     book = Books.objects.filter(call_number=call_number, isbn=isbn).first()
 
     if book:
         if book.is_archived:
             book.is_archived = False
             book.save(update_fields=["is_archived"])
-            
+
             return Response({'message':'Book Successfully Added!'}, status=status.HTTP_200_OK)
 
     serializer = AddBooksSerializer(data=request.data)
 
     if not serializer.is_valid():
-        first_errors = next(iter(serializer.errors.values()))
-        return Response({"message": first_errors[0], "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        return _first_error(serializer)
 
-    serializer.save()
+    copy_serializer = CopyFieldsSerializer(data=_copy_fields(request))
+
+    if not copy_serializer.is_valid():
+        return _first_error(copy_serializer)
+
+    # A title is never stored without its first copy.
+    try:
+        with transaction.atomic():
+            book = serializer.save()
+            copy_serializer.save(book=book, copy_number=1)
+    except IntegrityError:
+        # Another request took the ISBN, call number or accession number after validation.
+        return Response({'message': 'Book already exists'}, status=status.HTTP_400_BAD_REQUEST)
+
     return Response({'message':'Book Successfully Added!'}, status=status.HTTP_201_CREATED)
+
+def _requested_id(request, key):
+    try:
+        return int(request.data.get(key))
+    except (TypeError, ValueError):
+        return None
 
 def _requested_book_id(request):
     """Items are identified by primary key: theses may lack an ISBN and call numbers can be edited."""
-    try:
-        return int(request.data.get("book_id"))
-    except (TypeError, ValueError):
-        return None
+    return _requested_id(request, "book_id")
 
 def _missing_book_id():
     return Response({"message": "Missing book_id"}, status=status.HTTP_400_BAD_REQUEST)
@@ -85,12 +126,10 @@ def edit_book(request):
     if new_call_number and Books.objects.exclude(pk=book.pk).filter(call_number=new_call_number).exists():
         return Response({"message":"Call number already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Title fields only: condition and acquisition date belong to a copy (editCopy/).
     item_type = request.data.get("itemType", book.item_type)
-    condition = request.data.get("condition", book.condition)
     if item_type not in ItemType.values:
         return Response({"message":"Invalid item type"}, status=status.HTTP_400_BAD_REQUEST)
-    if condition not in ConditionChoices.values:
-        return Response({"message":"Invalid condition"}, status=status.HTTP_400_BAD_REQUEST)
 
     book.description = request.data.get("description", book.description)
     book.title = request.data.get("title", book.title)
@@ -101,7 +140,6 @@ def edit_book(request):
     book.year_published = request.data.get("year_published", book.year_published)
     book.tags = request.data.get("tags", book.tags)
     book.item_type = item_type
-    book.condition = condition
 
     book.save()
 
@@ -109,7 +147,7 @@ def edit_book(request):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def remove_book(request): 
+def remove_book(request):
     book_id = _requested_book_id(request)
 
     if book_id is None:
@@ -126,6 +164,82 @@ def remove_book(request):
     return Response({"message":"Book successfully removed"}, status=status.HTTP_200_OK)
 
 @api_view(["POST"])
+@permission_classes([IsAuthenticated, IsAdminRole])
+def add_copy(request):
+    book_id = _requested_book_id(request)
+
+    if book_id is None:
+        return _missing_book_id()
+
+    try:
+        with transaction.atomic():
+            # Lock the title so two concurrent adds cannot both take the same next copy number.
+            book = Books.objects.select_for_update().filter(pk=book_id).first()
+            if book is None:
+                return Response({"message":"Book not found"}, status=status.HTTP_404_NOT_FOUND)
+            if book.is_archived:
+                return Response({"message":"Book is archived"}, status=status.HTTP_400_BAD_REQUEST)
+
+            serializer = CopyFieldsSerializer(data=_copy_fields(request))
+            if not serializer.is_valid():
+                return _first_error(serializer)
+
+            copy = serializer.save(book=book, copy_number=next_copy_number(book))
+    except IntegrityError:
+        return _accession_taken()
+
+    return Response({"message":"Copy added", "copy":_copy_payload(copy)}, status=status.HTTP_201_CREATED)
+
+def _requested_copy(request):
+    """Return (copy, error response)."""
+    copy_id = _requested_id(request, "copy_id")
+    if copy_id is None:
+        return None, Response({"message":"Missing copy_id"}, status=status.HTTP_400_BAD_REQUEST)
+
+    copy = BookCopy.objects.filter(pk=copy_id).first()
+    if copy is None:
+        return None, Response({"message":"Copy not found"}, status=status.HTTP_404_NOT_FOUND)
+    return copy, None
+
+@api_view(["PUT"])
+@permission_classes([IsAuthenticated, IsAdminRole])
+def edit_copy(request):
+    copy, error = _requested_copy(request)
+    if error:
+        return error
+
+    serializer = CopyFieldsSerializer(copy, data=_copy_fields(request), partial=True)
+    if not serializer.is_valid():
+        return _first_error(serializer)
+
+    try:
+        with transaction.atomic():
+            serializer.save()
+    except IntegrityError:
+        return _accession_taken()
+
+    return Response({"message":"Copy successfully edited", "copy":_copy_payload(copy)}, status=status.HTTP_200_OK)
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsAdminRole])
+def remove_copy(request):
+    copy, error = _requested_copy(request)
+    if error:
+        return error
+
+    with transaction.atomic():
+        # The same title lock as assign_copy, so a borrow cannot take this copy between check and archive.
+        Books.objects.select_for_update().filter(pk=copy.book_id).first()
+        if copy.loans.filter(status__in=HOLD_STATUSES).exists():
+            return Response({"message":"Copy is on loan"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Archived, not deleted, so its loan history survives.
+        copy.is_archived = True
+        copy.save(update_fields=["is_archived"])
+
+    return Response({"message":"Copy successfully removed"}, status=status.HTTP_200_OK)
+
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def borrow_book(request):
     id_number = request.data.get("id_number")
@@ -139,26 +253,33 @@ def borrow_book(request):
     if book_id is None:
         return _missing_book_id()
 
-    try:
-        book = Books.objects.get(pk=book_id)
-    except Books.DoesNotExist:
-        return Response({"message":"Book not found"}, status=status.HTTP_404_NOT_FOUND)
+    with transaction.atomic():
+        # Lock the title first so a double submit cannot pass the per-user check twice.
+        book = Books.objects.select_for_update().filter(pk=book_id).first()
+        if book is None:
+            return Response({"message":"Book not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    if book.is_archived:
-        return Response({"message":"Book is archived and cannot be borrowed"}, status=status.HTTP_400_BAD_REQUEST)
+        if book.is_archived:
+            return Response({"message":"Book is archived and cannot be borrowed"}, status=status.HTTP_400_BAD_REQUEST)
 
-    # A pending request or any checkout not yet returned (Active, Due, Overdue) holds the item.
-    open_statuses = [StatusChoices.PENDING, *user_analytics.OPEN_STATUSES]
-    if BorrowRecords.objects.filter(book=book, status__in=open_statuses).exists():
-        return Response({"message":"Book is already borrowed"}, status=status.HTTP_400_BAD_REQUEST)
+        if BorrowRecords.objects.filter(user=user, copy__book=book, status__in=HOLD_STATUSES).exists():
+            return Response({"message":"You already have a request or loan for this book"}, status=status.HTTP_400_BAD_REQUEST)
 
-    BorrowRecords.objects.create(
-        status = StatusChoices.PENDING,
-        user = user,
-        book = book
-    )
+        copy = assign_copy(book)
+        if copy is None:
+            return Response({"message":"All copies are currently borrowed"}, status=status.HTTP_400_BAD_REQUEST)
 
-    return Response({"message":"Book successfully borrowed"}, status=status.HTTP_200_OK)
+        loan = BorrowRecords.objects.create(
+            status = StatusChoices.PENDING,
+            user = user,
+            copy = copy
+        )
+
+    return Response({
+        "message":"Book successfully borrowed",
+        "loan_id": loan.pk,
+        "copy": CopyRefSerializer(copy).data,
+    }, status=status.HTTP_200_OK)
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -170,7 +291,7 @@ def get_user_borrowed_books(request):
     except UserProfile.DoesNotExist:
         return Response({"message":"User not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    borrowed_books = BorrowRecords.objects.filter(user=user, return_date__isnull=True)
+    borrowed_books = BorrowRecords.objects.filter(user=user, return_date__isnull=True).select_related("copy__book")
     serializer = UserBorrowRecordSerializer(borrowed_books, many=True)
 
     return Response({"books": serializer.data}, status=status.HTTP_200_OK)
@@ -178,7 +299,7 @@ def get_user_borrowed_books(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_all_borrowed_books(request):
-    records = BorrowRecords.objects.filter(user__user__isnull=False).select_related("user__user", "book")
+    records = BorrowRecords.objects.filter(user__user__isnull=False).select_related("user__user", "copy__book")
     serializer = AllBorrowRecordSerializer(records, many=True)
 
     return Response({
@@ -197,7 +318,7 @@ def export_borrowed_books_csv(request):
     try:
         records = BorrowRecords.objects.filter(
             user__user__isnull=False
-        ).select_related("user__user", "book")
+        ).select_related("user__user", "copy__book")
 
         buffer = io.StringIO()
         writer = csv.writer(buffer)
@@ -220,6 +341,9 @@ def export_borrowed_books_csv(request):
             'Book Title',
             'ISBN',
             'Call Number',
+            # Copy fields, appended so existing column positions do not move
+            'Copy Number',
+            'Accession Number',
         ])
 
         for r in records:
@@ -240,6 +364,9 @@ def export_borrowed_books_csv(request):
                 r.book.title,
                 r.book.isbn,
                 r.book.call_number,
+                # Copy fields
+                r.copy.copy_number,
+                r.copy.accession_number,
             ])
         current_date = timezone.now().strftime('%Y_%m_%d_%H%M')
         response = HttpResponse(buffer.getvalue(), content_type='text/csv')
@@ -249,15 +376,22 @@ def export_borrowed_books_csv(request):
     except Exception as e:
         return JsonResponse({"status": "failed", "message": "CSV export failed", "error": str(e)})
 
+def _requested_loan_id(request):
+    """Several borrowers can hold copies of one title, so a loan is identified by its own id."""
+    return _requested_id(request, "loan_id")
+
+def _missing_loan_id():
+    return Response({"message": "Missing loan_id"}, status=status.HTTP_400_BAD_REQUEST)
+
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
 def accept_borrowed_book(request):
-    book_id = _requested_book_id(request)
-    if book_id is None:
-        return _missing_book_id()
+    loan_id = _requested_loan_id(request)
+    if loan_id is None:
+        return _missing_loan_id()
 
     # Only a pending request can be accepted; cancelled ones also have no return date.
-    book_record = BorrowRecords.objects.filter(book_id=book_id, status=StatusChoices.PENDING).first()
+    book_record = BorrowRecords.objects.filter(pk=loan_id, status=StatusChoices.PENDING).first()
     if not book_record:
         return Response({"message":"Book not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -278,16 +412,16 @@ def accept_borrowed_book(request):
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
 def return_book(request):
-    book_id = _requested_book_id(request)
-    if book_id is None:
-        return _missing_book_id()
+    loan_id = _requested_loan_id(request)
+    if loan_id is None:
+        return _missing_loan_id()
 
     book = BorrowRecords.objects.filter(
-        book_id=book_id,
+        pk=loan_id,
         status__in=user_analytics.OPEN_STATUSES,
         return_date__isnull=True
     ).first()
-    
+
     if not book:
         return Response({"message": "No active book found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -297,20 +431,20 @@ def return_book(request):
     book.save()
 
     return Response({"message": "Book returned successfully"}, status=status.HTTP_200_OK)
-    
+
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
 def cancel_borrowed_book(request):
-    book_id = _requested_book_id(request)
-    if book_id is None:
-        return _missing_book_id()
+    loan_id = _requested_loan_id(request)
+    if loan_id is None:
+        return _missing_loan_id()
 
     book = BorrowRecords.objects.filter(
-        book_id=book_id,
+        pk=loan_id,
         return_date__isnull=True,
         status=StatusChoices.PENDING
     ).first()
-    
+
     if not book:
         return Response({"message": "No active book found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -484,7 +618,7 @@ def _dashboard_loan_page(request, loans, now, summary=None):
     query.is_valid(raise_exception=True)
     paginator = PageNumberPagination()
     paginator.page_size = query.validated_data['page_size']
-    loans = loans.select_related('book', 'fine').order_by(F('borrow_date').desc(nulls_last=True), '-pk')
+    loans = loans.select_related('copy__book', 'fine').order_by(F('borrow_date').desc(nulls_last=True), '-pk')
     page = paginator.paginate_queryset(loans, request)
     serializer = DashboardLoanSerializer(page, many=True, context={'today': user_analytics.library_today(now)})
     response = paginator.get_paginated_response(serializer.data)

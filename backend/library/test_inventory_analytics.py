@@ -3,11 +3,12 @@ from datetime import date
 from django.urls import reverse
 
 from accounts.models import RoleChoices, UserLogin, UserProfile
-from .models import Books, ConditionChoices, StatusChoices
+from .models import BookCopy, Books, ConditionChoices, StatusChoices
+from .test_admin_analytics import CopyFixtures, add_copy
 from .tests import DashboardTestCase
 
 
-class InventoryDashboardTests(DashboardTestCase):
+class InventoryDashboardTests(CopyFixtures, DashboardTestCase):
     def setUp(self):
         super().setUp()
         self.admin = UserLogin.objects.create_user('admin@example.com', 'test-password', role=RoleChoices.ADMIN)
@@ -42,8 +43,8 @@ class InventoryDashboardTests(DashboardTestCase):
         self.make_book('100.C')
         lost_on_loan = self.make_book('100.D')
         damaged = self.make_book('100.E')
-        Books.objects.filter(pk=damaged.pk).update(condition=ConditionChoices.DAMAGED)
-        Books.objects.filter(pk=lost_on_loan.pk).update(condition=ConditionChoices.LOST)
+        BookCopy.objects.filter(book=damaged).update(condition=ConditionChoices.DAMAGED)
+        BookCopy.objects.filter(book=lost_on_loan).update(condition=ConditionChoices.LOST)
         self.loan(book=out)
         self.loan(book=late, due_date=date(2026, 10, 1))
         self.loan(book=lost_on_loan, due_date=date(2026, 9, 20))
@@ -68,17 +69,52 @@ class InventoryDashboardTests(DashboardTestCase):
         self.assertEqual([item['loan_id'] for item in items], [older.pk, newer.pk])
         self.assertEqual(items[0], {
             'loan_id': older.pk, 'borrower_id': 'reader', 'borrower': 'Ana Cruz', 'title': 'Book 200.A',
-            'call_number': '200.A', 'due_date': '2026-09-28', 'days_overdue': 9,
+            'call_number': '200.A', 'copy_number': 1, 'accession_number': '', 'due_date': '2026-09-28', 'days_overdue': 9,
         })
 
 
-class EditBookClassificationTests(DashboardTestCase):
-    def test_edit_book_sets_and_validates_item_type_and_condition(self):
+    def test_overdue_items_name_the_copy(self):
+        book = self.make_book('300.A')
+        add_copy(book)
+        copy = add_copy(book, accession_number='ACC-0003')
+        self.loan(copy=copy, due_date=date(2026, 10, 1))
+        item = self.dashboard()['overdue_items'][0]
+        self.assertEqual((item['copy_number'], item['accession_number'], item['call_number']), (3, 'ACC-0003', '300.A'))
+
+    def test_archived_copies_and_titles_are_not_counted(self):
+        add_copy(self.book, is_archived=True)
+        add_copy(self.book, condition=ConditionChoices.LOST, is_archived=True)
+        archived_title = self.make_book('400.A')
+        Books.objects.filter(pk=archived_title.pk).update(is_archived=True)
+        add_copy(archived_title, condition=ConditionChoices.DAMAGED)
+        self.loan(copy=archived_title.copies.first())
+        stats = self.dashboard()['statistics']
+        self.assertEqual(stats['total_copies'], 1)
+        self.assertEqual(stats['borrowed']['value'], 0)
+        self.assertEqual(stats['lost_damaged']['value'], 0)
+        self.assertEqual(stats['available'], {'value': 1, 'percentage': 100.0})
+
+    def test_copies_of_one_title_are_counted_separately(self):
+        add_copy(self.book, condition=ConditionChoices.DAMAGED)
+        out = add_copy(self.book)
+        add_copy(self.book)
+        self.loan(copy=out)
+        stats = self.dashboard()['statistics']
+        self.assertEqual(stats['total_copies'], 4)
+        self.assertEqual(stats['borrowed']['value'], 1)
+        self.assertEqual(stats['lost_damaged']['value'], 1)
+        self.assertEqual(stats['available']['value'], 2)
+
+
+class EditBookClassificationTests(CopyFixtures, DashboardTestCase):
+    def test_edit_book_sets_and_validates_item_type_and_ignores_condition(self):
         url = reverse('edit_book')
+        copy = self.book.copies.get()
         response = self.client.put(url, {'book_id': self.book.pk, 'itemType': 'thesis', 'condition': 'lost'}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
         self.book.refresh_from_db()
-        self.assertEqual((self.book.item_type, self.book.condition), ('thesis', 'lost'))
-        for field in ('itemType', 'condition'):
-            response = self.client.put(url, {'book_id': self.book.pk, field: 'bogus'}, format='json')
-            self.assertEqual(response.status_code, 400)
+        copy.refresh_from_db()
+        self.assertEqual(self.book.item_type, 'thesis')
+        self.assertEqual(copy.condition, ConditionChoices.GOOD)  # condition belongs to editCopy now
+        response = self.client.put(url, {'book_id': self.book.pk, 'itemType': 'bogus'}, format='json')
+        self.assertEqual(response.status_code, 400)

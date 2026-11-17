@@ -1,13 +1,15 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
-from .models import Books, BorrowRecords, RoomReservation, ItemType
+from .models import BookCopy, Books, BorrowRecords, RoomReservation, ItemType
+from .copies import available_copies
 from accounts.models import EducationLevel
 from accounts.serializers import UserProfileSerializer, UserLoginSerializer
 from django.utils import timezone
 from .models import StatusChoices
 from .user_analytics import library_timezone, money
 
-class BooksSerializer(serializers.ModelSerializer):
+# Title fields only; nested in loan records, where copy lists and counts do not belong.
+class BookTitleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Books
         fields = [
@@ -23,12 +25,37 @@ class BooksSerializer(serializers.ModelSerializer):
             "year_published",
             "pages",
             "cover_url",
-            "date_acquired",
             "item_type",
-            "condition",
             "is_archived",
         ]
-        
+
+class CopyRefSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BookCopy
+        fields = ["id", "copy_number", "accession_number"]
+
+class CopySerializer(serializers.ModelSerializer):
+    is_available = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BookCopy
+        fields = ["id", "copy_number", "accession_number", "condition", "date_acquired", "is_available"]
+
+    def get_is_available(self, copy):
+        # Listings annotate is_available (see views.with_availability) so a page of copies costs no extra queries.
+        if hasattr(copy, "is_available"):
+            return copy.is_available
+        return available_copies().filter(pk=copy.pk).exists()
+
+class BooksSerializer(BookTitleSerializer):
+    total_copies = serializers.IntegerField(read_only=True)
+    available_copies = serializers.IntegerField(read_only=True)
+    # Filled by the get_books Prefetch: non-archived copies, by copy number.
+    copies = CopySerializer(source="listed_copies", many=True, read_only=True)
+
+    class Meta(BookTitleSerializer.Meta):
+        fields = BookTitleSerializer.Meta.fields + ["total_copies", "available_copies", "copies"]
+
 class AddBooksSerializer(serializers.ModelSerializer):
     class Meta:
         model = Books
@@ -44,9 +71,7 @@ class AddBooksSerializer(serializers.ModelSerializer):
             "year_published",
             "pages",
             "cover_url",
-            "date_acquired",
             "item_type",
-            "condition"
         ]
         extra_kwargs = {
             # Mirrors books_isbn_unique_nonblank: blank ISBNs (theses) may repeat.
@@ -60,17 +85,36 @@ class AddBooksSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"isbn": "ISBN is required for books."})
         return attrs
 
+# The per-copy fields accepted by addBook, addCopy and editCopy; every one is optional.
+class CopyFieldsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BookCopy
+        fields = ["accession_number", "condition", "date_acquired"]
+        extra_kwargs = {
+            # Mirrors book_copy_accession_unique_nonblank: copies without a barcode may repeat ''.
+            "accession_number": {"validators": [
+                UniqueValidator(queryset=BookCopy.objects.exclude(accession_number=""),
+                                message="Accession number already exists"),
+            ]},
+            "condition": {"error_messages": {
+                "invalid_choice": "Invalid condition", "blank": "Invalid condition", "null": "Invalid condition",
+            }},
+        }
+
 class AllBorrowRecordSerializer(serializers.ModelSerializer):
     user = UserProfileSerializer(read_only=True)
     email = serializers.CharField(source="user.user.email")
-    book = BooksSerializer(read_only=True)
+    book = BookTitleSerializer(read_only=True)
+    copy = CopyRefSerializer(read_only=True)
     
     class Meta:
         model = BorrowRecords
         fields = [
+            "id",
             "user",
             "email",
             "book",
+            "copy",
             "borrow_date",
             "return_date",
             "due_date",
@@ -78,11 +122,12 @@ class AllBorrowRecordSerializer(serializers.ModelSerializer):
         ]
         
 class UserBorrowRecordSerializer(serializers.ModelSerializer):
-    cover_url = serializers.CharField(source="book.cover_url")
+    cover_url = serializers.CharField(source="copy.book.cover_url")
     
     class Meta:
         model = BorrowRecords
         fields = [
+            "id",
             "cover_url",
             "due_date",
             "status"
@@ -114,17 +159,19 @@ class RoomReservationSerializer(serializers.ModelSerializer):
 
 class DashboardLoanSerializer(serializers.ModelSerializer):
     loan_id = serializers.IntegerField(source='pk', read_only=True)
-    book_id = serializers.IntegerField(read_only=True)
-    title = serializers.CharField(source='book.title', read_only=True)
-    call_number = serializers.CharField(source='book.call_number', read_only=True)
+    book_id = serializers.IntegerField(source='copy.book_id', read_only=True)
+    title = serializers.CharField(source='copy.book.title', read_only=True)
+    call_number = serializers.CharField(source='copy.book.call_number', read_only=True)
+    copy_number = serializers.IntegerField(source='copy.copy_number', read_only=True)
+    accession_number = serializers.CharField(source='copy.accession_number', read_only=True)
     borrow_date = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
     fine = serializers.SerializerMethodField()
 
     class Meta:
         model = BorrowRecords
-        fields = ('loan_id', 'book_id', 'title', 'call_number', 'borrow_date',
-                  'due_date', 'return_date', 'status', 'fine')
+        fields = ('loan_id', 'book_id', 'title', 'call_number', 'copy_number', 'accession_number',
+                  'borrow_date', 'due_date', 'return_date', 'status', 'fine')
 
     def get_borrow_date(self, loan):
         if loan.status == StatusChoices.PENDING or loan.borrow_date is None:

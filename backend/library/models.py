@@ -31,13 +31,6 @@ class Books(models.Model):
         default=ItemType.BOOK,
     )
 
-    # Lost or damaged copies leave the circulating collection until restored to good.
-    condition = models.CharField(
-        max_length=20,
-        choices=ConditionChoices.choices,
-        default=ConditionChoices.GOOD,
-    )
-   
     is_archived = models.BooleanField(
         default=False
     )
@@ -95,11 +88,6 @@ class Books(models.Model):
         null=True,
     )
 
-    date_acquired = models.CharField(
-        max_length=100,
-        blank=True
-    )
-
     class Meta:
         db_table = 'books'
         constraints = [
@@ -111,15 +99,68 @@ class Books(models.Model):
             ),
         ]
 
+# One physical item of a title; condition and acquisition belong to the item, not the title.
+class BookCopy(models.Model):
+    book = models.ForeignKey(
+        Books,
+        on_delete=models.CASCADE,
+        related_name='copies'
+    )
+
+    # Shown as "c.2"; never reused, so archived copies keep their number.
+    copy_number = models.PositiveIntegerField()
+
+    # The barcode. Blank until the library supplies one; never invent values.
+    accession_number = models.CharField(
+        max_length=50,
+        blank=True
+    )
+
+    # Lost or damaged copies leave the circulating collection until restored to good.
+    condition = models.CharField(
+        max_length=20,
+        choices=ConditionChoices.choices,
+        default=ConditionChoices.GOOD,
+    )
+
+    date_acquired = models.CharField(
+        max_length=100,
+        blank=True
+    )
+
+    # A withdrawn copy; kept so its loan history survives.
+    is_archived = models.BooleanField(
+        default=False
+    )
+
+    class Meta:
+        db_table = 'book_copies'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['book', 'copy_number'],
+                name='book_copy_number_unique',
+            ),
+            models.UniqueConstraint(
+                fields=['accession_number'],
+                condition=~models.Q(accession_number=''),
+                name='book_copy_accession_unique_nonblank',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.book_id} c.{self.copy_number}'
+
 class BorrowRecords(models.Model):
     user = models.ForeignKey(
         UserProfile,
         on_delete=models.CASCADE
     )
 
-    book = models.ForeignKey(
-        Books,
-        on_delete=models.CASCADE
+    # A loan names the exact item; the title is reached through copy__book.
+    copy = models.ForeignKey(
+        BookCopy,
+        on_delete=models.CASCADE,
+        related_name='loans'
     )
 
     borrow_date = models.DateTimeField(
@@ -146,6 +187,21 @@ class BorrowRecords(models.Model):
     class Meta:
         db_table = 'borrow_records'
         indexes = [models.Index(fields=['user', 'borrow_date'], name='loan_user_borrow_idx')]
+        constraints = [
+            # A copy can be requested or out to one borrower at a time.
+            models.UniqueConstraint(
+                fields=['copy'],
+                condition=models.Q(status__in=[
+                    StatusChoices.PENDING, StatusChoices.ACTIVE, StatusChoices.DUE, StatusChoices.OVERDUE,
+                ]),
+                name='loan_one_open_per_copy',
+            ),
+        ]
+
+    # Read-only convenience for non-ORM code (e.g. the CSV export); queries use copy__book.
+    @property
+    def book(self):
+        return self.copy.book
 
 class RoomReservation(models.Model):
     user = models.ForeignKey(

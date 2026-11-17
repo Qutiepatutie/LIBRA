@@ -20,7 +20,7 @@ def circulation_loans(params, now):
     # Actual checkouts only; pending and cancelled requests never left the shelf.
     loans = BorrowRecords.objects.filter(status__in=CHECKOUT_STATUSES, borrow_date__lte=now)
     if params['item_type'] != 'all':
-        loans = loans.filter(book__item_type=params['item_type'])
+        loans = loans.filter(copy__book__item_type=params['item_type'])
     if params['program']:
         loans = loans.filter(user__program__in=params['program'])
     return loans
@@ -154,12 +154,12 @@ def checkout_series(window, range_, start, end):
 
 
 def top_borrowed(window):
-    # Group by work rather than copy, so several copies of one title rank together.
+    # Group by title id, so several copies of one title rank together.
     def ranked(item_type):
-        rows = (window.filter(book__item_type=item_type)
-                .values('book__title', 'book__author').annotate(count=Count('pk'))
-                .order_by('-count', 'book__title')[:TOP_LIMIT])
-        return [{'title': row['book__title'], 'author': row['book__author'], 'count': row['count']} for row in rows]
+        rows = (window.filter(copy__book__item_type=item_type)
+                .values('copy__book_id', 'copy__book__title', 'copy__book__author').annotate(count=Count('pk'))
+                .order_by('-count', 'copy__book__title', 'copy__book_id')[:TOP_LIMIT])
+        return [{'title': row['copy__book__title'], 'author': row['copy__book__author'], 'count': row['count']} for row in rows]
     return {item_type: ranked(item_type) for item_type in ItemType.values}
 
 

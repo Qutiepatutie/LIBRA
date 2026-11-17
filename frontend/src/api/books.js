@@ -83,14 +83,14 @@ export async function getAllBorrowers() {
     }
 }
 
-export async function acceptBorrowedBook(book_id) {
+export async function acceptBorrowedBook(loan_id) {
     try {
         const resp = await authFetch(`${API_URL}/acceptBorrowedBook/`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ book_id })
+            body: JSON.stringify({ loan_id })
         });
     
         return await returnData(resp)
@@ -99,14 +99,14 @@ export async function acceptBorrowedBook(book_id) {
     }
 }
 
-export async function returnBook(book_id) {
+export async function returnBook(loan_id) {
     try {
         const resp = await authFetch(`${API_URL}/returnBook/` , {
           method: 'PUT',
           headers: {
             'Content-Type':'application/json',
           },
-          body: JSON.stringify({ book_id })
+          body: JSON.stringify({ loan_id })
         });
 
         return await returnData(resp);
@@ -116,14 +116,14 @@ export async function returnBook(book_id) {
     }
 }
 
-export async function cancelBorrowedBook(book_id) {
+export async function cancelBorrowedBook(loan_id) {
     try {
         const resp = await authFetch(`${API_URL}/cancelBorrowedBook/` , {
           method: 'PUT',
           headers: {
             'Content-Type':'application/json',
           },
-          body: JSON.stringify({ book_id })
+          body: JSON.stringify({ loan_id })
         });
 
         return await returnData(resp);
@@ -144,6 +144,57 @@ export async function borrowBook(data){
         });
 
         return await returnData(resp)
+        
+    } catch {
+        return ({"status": 500, "message":"Connection to Server Failed"});
+    }
+}
+
+export async function addCopy(data){
+    try {
+        const resp = await authFetch(`${API_URL}/addCopy/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+
+        return await returnData(resp);
+        
+    } catch {
+        return ({"status": 500, "message":"Connection to Server Failed"});
+    }
+}
+
+export async function editCopy(data){
+    try {
+        const resp = await authFetch(`${API_URL}/editCopy/`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+
+        return await returnData(resp);
+        
+    } catch {
+        return ({"status": 500, "message":"Connection to Server Failed"});
+    }
+}
+
+export async function removeCopy(data){
+    try {
+        const resp = await authFetch(`${API_URL}/removeCopy/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data)
+        });
+
+        return await returnData(resp);
         
     } catch {
         return ({"status": 500, "message":"Connection to Server Failed"});
