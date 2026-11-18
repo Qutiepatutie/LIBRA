@@ -1,6 +1,7 @@
 .bookPanel {
     position: relative;
     width: clamp(100px, 8.5vw, 200px);
+    aspect-ratio: 2/3;
     border: 1px solid rgba(0,0,0,0.5);
     border-radius: 5px;
 

@@ -1,10 +1,12 @@
 import styles from "../../../styles/library/showBook/showbook.module.css"
 import close from "../../../assets/close-icon.svg"
 import trash from "../../../assets/pages/library/trash.svg"
+import libby from "../../../assets/pages/library/libby.svg"
 
 import { useState, useEffect } from "react";
 
 import CustomButton from "../../ui/CustomButton.jsx";
+import { Selector } from "../../ui/Inputs.jsx";
 import BookInfos from "./BookInfos.jsx";
 
 import { CONDITIONS, details } from "./showbook.constants.js"
@@ -14,6 +16,7 @@ import { getStorage } from "../../../pages/auth/auth.util.js";
 import Toast from "../../ui/Toast.jsx"
 import ConfirmBorrowPanel from "../ConfirmBorrowPanel.jsx";
 import ConfirmRemovePanel from "./ConfirmRemovePanel.jsx";
+import BookPanel from "../BookPanel.jsx"
 
 // Statuses that hold an item; the backend refuses a new borrow for any of them.
 const OPEN_LOAN_STATUSES = ["Pending", "Active", "Due", "Overdue"];
@@ -192,42 +195,12 @@ export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBoo
                             />
                         </div>
 
-                        <div className={styles.copies}>
-                            <p>{currBook.available_copies} of {currBook.total_copies} copies available</p>
-                            {isAdmin && (
-                                <>
-                                    {currBook.copies?.map(copy => (
-                                        <div key={copy.id} className={styles.copy}>
-                                            <span>
-                                                c.{copy.copy_number}
-                                                {copy.accession_number && ` (${copy.accession_number})`}
-                                            </span>
-                                            <select
-                                                value={copy.condition}
-                                                disabled={loading}
-                                                onChange={(e) => handleEditCopy(copy, { condition: e.target.value })}
-                                            >
-                                                {CONDITIONS.map(c => (
-                                                    <option key={c} value={c}>{c}</option>
-                                                ))}
-                                            </select>
-                                            <button
-                                                type="button"
-                                                disabled={loading}
-                                                onClick={() => handleRemoveCopy(copy)}
-                                            >
-                                                Remove
-                                            </button>
-                                        </div>
-                                    ))}
-                                    <button type="button" disabled={loading} onClick={handleAddCopy}>
-                                        Add copy
-                                    </button>
-                                </>
-                            )}
-                        </div>
 
-                        <div className={styles.buttonContainer}>
+                        <div className={`${styles.buttonContainer} ${role !== "admin" ? styles.column : ""}`}>
+                            {role !== "admin" && (
+                                <p className={styles.copy}>{currBook.available_copies} of {currBook.total_copies} Copies Available</p>
+                            )}
+                            
                             {role === "admin" && (
                                 <div className={styles.deleteButton}>
                                     <CustomButton 
@@ -261,6 +234,64 @@ export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBoo
                                 />
                             </div>
                         </div>
+                        
+                        {isAdmin && (
+                            <div className={styles.copiesContainer}>
+                                {currBook.copies?.map(copy => (
+                                    <div key={copy.id} className={styles.copy}>
+                                        <span className={styles.copyCode}>
+                                            c.{copy.copy_number}
+                                            {copy.accession_number && ` (${copy.accession_number})`}
+                                        </span>
+                                        
+                                        <div className={styles.copyCondition}>
+                                            <Selector
+                                                value={copy.condition}
+                                                disabled={loading}
+                                                onChange={(e) => handleEditCopy(copy, { condition: e.target.value })}
+                                                options={CONDITIONS}
+                                            />
+                                        </div>
+                                        
+                                        <div className={styles.removeCopy}>
+                                            <CustomButton
+                                                value={<img className={styles.trash} src={trash} />}
+                                                action="delete"
+                                                disabled={loading}
+                                                onClick={() => handleRemoveCopy(copy)}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                                <div className={styles.addCopy}>
+                                    <CustomButton
+                                        value={"Add Copy"}
+                                        disabled={loading}
+                                        onClick={handleAddCopy}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        
+                        {role !== "admin" && (
+                            <div className={styles.recommendationContainer}>
+                                {/* <p className={styles.header}>Recommended Books</p>*/}
+                                <div className={styles.recommendations}>
+                                    {/* {Array.from({ length: 10 }).map((book, index) => (
+                                        <BookPanel
+                                            key={index}
+                                            book={book}
+                                        />
+                                    ))}*/}
+                                    
+                                    {/* TEMP*/}
+                                    <div className={styles.comingSoonContainer}>
+                                        <img src={libby} />
+                                        <p>Book recommendations will be coming soon!</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
