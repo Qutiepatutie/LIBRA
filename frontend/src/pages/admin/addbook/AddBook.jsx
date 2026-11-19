@@ -37,6 +37,10 @@ export default function AddBook() {
 
     const [showToast, setShowToast] = useState(false);
 
+    const [coverImage, setCoverImage] = useState(null);
+    const [coverPreview, setCoverPreview] = useState("");
+    
+    const coverInputRef = useRef(null);
     const lastISBNRef = useRef("");
 
     const notify = () => {
@@ -66,6 +70,14 @@ export default function AddBook() {
         console.log(bookData);
     }, [bookData]);
 
+    useEffect(() => {
+        return () => {
+            if (coverPreview) {
+                URL.revokeObjectURL(coverPreview);
+            }
+        };
+    }, [coverPreview]);
+
     const handleChange = (field, value) => {
         setValueErrors(prev => ({ ...prev, [field] : false}));
         setBookData(prev => {
@@ -88,11 +100,21 @@ export default function AddBook() {
         setBookData(initialFormValues);
         setValueErrors(initialFormErrors);
         setAutofilled(false);
+
+        setCoverImage(null);
+        setCoverPreview("");
+
+        if (coverInputRef.current) {
+            coverInputRef.current.value = "";
+        }
+        
         lastISBNRef.current = "";
     }
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+
+        if (isSubmitting) return;
 
         const fields = Object.keys(initialFormErrors);
 
@@ -120,14 +142,18 @@ export default function AddBook() {
         if(Object.values(empty).some(Boolean)) return;
         console.log("Book Added");
 
-        if(bookData.cover_url === null) {
+        if(!bookData.cover_url && !coverImage) {
             setToastMessage("Invalid Book");
             notify();
             return;
         }
 
-        addBook(bookData);
-        setBookData(initialFormValues);
+        const resp = await addBook(bookData, coverImage);
+        notify();
+
+        if (resp.status === 201 || resp.status === 200) {
+            handleClear();
+        }
         // setBookData(prev => ({
         //     ...prev,
         //     ...Object.fromEntries(
@@ -136,7 +162,6 @@ export default function AddBook() {
         //         ))
         //     )
         // }))
-        setAutofilled(false);
         if(!isSubmitting) notify();
     }
 
@@ -165,24 +190,71 @@ export default function AddBook() {
         setAutofilled(true);
     }
 
+    const handleCoverChange = (e) => {
+        console.log(e.target.files[0]);
+        const file = e.target.files[0];
+
+        if (!file) return;
+
+        const allowedTypes = [
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+        ];
+
+        if (!allowedTypes.includes(file.type)) {
+            setToastMessage("Only JPG, PNG, and WEBP images are allowed");
+            notify();
+            e.target.value = "";
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            setToastMessage("Image must not exceed 5MB");
+            notify();
+            e.target.value = "";
+            return;
+        }
+
+        setCoverImage(file);
+
+        const previewURL = URL.createObjectURL(file);
+        console.log(previewURL);
+        setCoverPreview(previewURL);
+
+        setBookData(prev => ({
+            ...prev,
+            cover_url: ""
+        }));
+    }
+
     return (
         <>
             <Toast message={toastMessage} show={showToast}/>
             <div className={styles.addbook}>
                 <div className={styles.container}>
                     <div className={styles.cover} 
-                    style={{borderColor:(bookData.cover_url && !isAutofilling 
+                        style={{borderColor:(bookData.cover_url && !isAutofilling 
                                 ? "transparent" 
                                 : "")}}
+
+                        onClick={() => coverInputRef.current.click()}
                     >
                         {isAutofilling 
                             ? <p>Loading...</p>
-                            : bookData.cover_url
-                                ? <img src={bookData.cover_url} />
+                            : coverPreview || bookData.cover_url
+                                ? <img src={coverPreview || bookData.cover_url} />
                                 : !autofilled
                                     ? <p>Add Cover</p>
                                     : <p>No Available Cover</p> 
                         }
+                        <input
+                            ref={coverInputRef}
+                            type="file"
+                            className={styles.coverInput}
+                            onChange={handleCoverChange}
+                            hidden
+                        />
                     </div>
     
                     <form className={styles.infos} onSubmit={handleSubmit}>

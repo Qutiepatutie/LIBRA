@@ -9,7 +9,7 @@ export const initialFormValues = {
     accession_number: "",
     year_published: "",
     pages: "",
-    tags: "",
+    tags: [],
     classification: "",
     call_number: "",
     cover_url: null,

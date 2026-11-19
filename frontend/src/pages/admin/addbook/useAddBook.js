@@ -56,11 +56,18 @@ export function useAddBook() {
         }
     }
 
-    async function addBook(data) {
+    async function addBook(data, coverImage) {
         setIsSubmitting(true);
-        const resp = await addBookUtil(data);
-        setToastMessage(resp.message);
-        setIsSubmitting(false);
+
+        try {
+            const resp = await addBookUtil(data, coverImage);
+            setToastMessage(resp.message);
+
+            return resp;
+            
+        } finally {
+            setIsSubmitting(false);
+        }
     }
 
     const handleLoadData = (value = "") => 

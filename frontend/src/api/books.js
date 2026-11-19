@@ -12,14 +12,27 @@ export async function autofillBookInfo(isbn) {
     }
 }
 
-export async function addBook(data){
+export async function addBook(data, coverImage){
     try {
+        const formData = new FormData();
+
+        Object.entries(data).forEach(([key, value]) => {
+            if (value !== null && value !== undefined) {
+                if (Array.isArray(value) || typeof value === "object") {
+                    formData.append(key, JSON.stringify(value));
+                } else {
+                    formData.append(key, value);
+                }
+            }
+        });
+
+        if (coverImage) {
+            formData.append("cover_image", coverImage);
+        }
+        
         const resp = await authFetch(`${API_URL}/addBook/`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(data)
+          body: formData,
         });
 
         return await returnData(resp);

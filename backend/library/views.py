@@ -1,14 +1,15 @@
 import csv
 import io
-import json
 from django.views.decorators.csrf import csrf_exempt
 from .permissions import IsAdminRole
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.db import IntegrityError, transaction
+from django.core.exceptions import ValidationError
 from django.db.models import Exists, F, OuterRef, Prefetch
 
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
@@ -21,6 +22,7 @@ from .serializers import CopyFieldsSerializer, CopyRefSerializer, CopySerializer
 from .serializers import DashboardLoanSerializer, DashboardPageQuerySerializer, CirculationQuerySerializer, BorrowersQuerySerializer
 from .copies import HOLD_STATUSES, assign_copy, available_copies, next_copy_number, with_copy_counts
 from . import admin_analytics, inventory_analytics, borrower_analytics, user_analytics
+from .image_upload import upload_book_cover,delete_book_cover
 
 COPY_FIELDS = ("accession_number", "condition", "date_acquired")
 
@@ -55,6 +57,7 @@ def get_books(request):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
 def add_books(request):
     call_number = request.data.get("call_number")
     isbn = request.data.get("isbn")
@@ -73,9 +76,16 @@ def add_books(request):
             book.save(update_fields=["is_archived"])
 
             return Response({'message':'Book Successfully Added!'}, status=status.HTTP_200_OK)
+            
+        return Response({'message': 'Book already exists'}, status=status.HTTP_400_BAD_REQUEST)
 
-    serializer = AddBooksSerializer(data=request.data)
+    data = request.data.copy()
+    data.pop("cover_image", None)
 
+    provided_cover_url = data.get("cover_url")
+
+    serializer = AddBooksSerializer(data=data)
+    
     if not serializer.is_valid():
         return _first_error(serializer)
 
@@ -84,14 +94,42 @@ def add_books(request):
     if not copy_serializer.is_valid():
         return _first_error(copy_serializer)
 
+    image = request.FILES.get("cover_image")
+    cover_url = provided_cover_url
+    cover_path = None
+
+    if image:
+        try:
+            cover_url, cover_path = upload_book_cover(image)
+        except ValidationError as err:
+            return Response(
+                {"message": str(err)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        except Exception:
+            return Response(
+                {"message": "Failed to upload book cover"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+            
     # A title is never stored without its first copy.
     try:
         with transaction.atomic():
-            book = serializer.save()
+            book = serializer.save(cover_url=cover_url)
             copy_serializer.save(book=book, copy_number=1)
     except IntegrityError:
+        if cover_path:
+            delete_book_cover(cover_path)
+        
         # Another request took the ISBN, call number or accession number after validation.
         return Response({'message': 'Book already exists'}, status=status.HTTP_400_BAD_REQUEST)
+
+    except Exception:
+        if cover_path:
+            delete_book_cover(cover_path)
+
+        raise
 
     return Response({'message':'Book Successfully Added!'}, status=status.HTTP_201_CREATED)
 

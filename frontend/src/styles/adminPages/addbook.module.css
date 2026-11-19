@@ -28,6 +28,11 @@
 
     font-size: 3.5em;
     color: var(--primary-color);
+
+    &:hover {
+        cursor: pointer;
+        opacity: 50%;
+    }
 }
 
 .cover img {
