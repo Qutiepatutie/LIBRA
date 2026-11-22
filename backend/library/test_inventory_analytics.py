@@ -109,6 +109,7 @@ class InventoryDashboardTests(CopyFixtures, DashboardTestCase):
 class EditBookClassificationTests(CopyFixtures, DashboardTestCase):
     def test_edit_book_sets_and_validates_item_type_and_ignores_condition(self):
         url = reverse('edit_book')
+        self.client = self.desk_client()
         copy = self.book.copies.get()
         response = self.client.put(url, {'book_id': self.book.pk, 'itemType': 'thesis', 'condition': 'lost'}, format='json')
         self.assertEqual(response.status_code, 200, response.data)

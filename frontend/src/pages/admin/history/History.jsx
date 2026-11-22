@@ -5,12 +5,14 @@ import { useLocation } from "react-router-dom";
 
 import { SearchBar } from "../../../components/ui/Inputs.jsx"
 import { useBorrowers } from "../../../hooks/useBorrowers.js";
+import { exportBorrowedBooksCSV } from "../../../api/books.js";
 
 import Status from "../../../components/ui/Status.jsx"
 import CustomButton from "../../../components/ui/CustomButton.jsx"
+import Toast from "../../../components/ui/Toast.jsx"
 
 export default function History() {
-    const { allBorrowers, allReservations, searchBorrowers } = useBorrowers();
+    const { allBorrowers, allReservations, searchBorrowers, toastMessage, showToast, showToastFunc } = useBorrowers();
     const [query, setQuery] = useState("");
 
     const { pathname } = useLocation();
@@ -55,7 +57,26 @@ export default function History() {
     
     const isRecordFound = tableData[page].list.length > 0;
 
-    const handleExport = () => {
+    const handleExport = async () => {
+        if (page === "books") {
+            const resp = await exportBorrowedBooksCSV();
+
+            if (resp.status !== 200) {
+                showToastFunc(resp.message);
+                return;
+            }
+
+            const url = URL.createObjectURL(resp.blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = resp.filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+            return;
+        }
+
         const apiUrl = import.meta.env.VITE_API_URL;
 
         const endPoints = {
@@ -69,6 +90,7 @@ export default function History() {
 
     return (
         <div className={styles.borrowers}>
+            <Toast message={toastMessage} show={showToast} />
             <div className={styles.header}>
                 <SearchBar 
                     placeholder="Search by name or ID number"

@@ -1,8 +1,8 @@
 import csv
 import io
-from django.views.decorators.csrf import csrf_exempt
+import logging
 from .permissions import IsAdminRole
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse
 from django.utils import timezone
 from django.db import IntegrityError, transaction
 from django.core.exceptions import ValidationError
@@ -25,6 +25,37 @@ from . import admin_analytics, inventory_analytics, borrower_analytics, user_ana
 from .image_upload import upload_book_cover,delete_book_cover
 
 COPY_FIELDS = ("accession_number", "condition", "date_acquired")
+
+logger = logging.getLogger(__name__)
+
+def _is_admin(request):
+    # The same JWT role test the admin-only endpoints use.
+    return IsAdminRole().has_permission(request, None)
+
+def _own_profile(request):
+    try:
+        return request.user.profile
+    except UserProfile.DoesNotExist:
+        return None
+
+def _borrower_profile(request, key, denied_message):
+    """Return (profile, error response) for whose loans this request acts on.
+
+    The caller's own profile by default. A student may name only themselves; an admin may name anyone.
+    """
+    own = _own_profile(request)
+    requested = request.data.get(key)
+
+    if requested in (None, "") or (own and str(requested) == own.id_number):
+        profile = own
+    elif not _is_admin(request):
+        return None, Response({"message": denied_message}, status=status.HTTP_403_FORBIDDEN)
+    else:
+        profile = UserProfile.objects.filter(id_number=requested).first()
+
+    if profile is None:
+        return None, Response({"message":"User not found"}, status=status.HTTP_404_NOT_FOUND)
+    return profile, None
 
 def with_availability(copies_qs):
     """Annotate is_available from the single rule in copies.py, so listing copies costs no query per copy."""
@@ -56,7 +87,7 @@ def get_books(request):
     return Response({"data": serializer.data}, status=status.HTTP_200_OK)
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminRole])
 @parser_classes([MultiPartParser, FormParser])
 def add_books(request):
     call_number = request.data.get("call_number")
@@ -147,7 +178,7 @@ def _missing_book_id():
     return Response({"message": "Missing book_id"}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(["PUT"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminRole])
 def edit_book(request):
     book_id = _requested_book_id(request)
 
@@ -165,7 +196,8 @@ def edit_book(request):
         return Response({"message":"Call number already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
     # Title fields only: condition and acquisition date belong to a copy (editCopy/).
-    item_type = request.data.get("itemType", book.item_type)
+    # item_type matches addBook/; itemType is still read for older callers.
+    item_type = request.data.get("item_type", request.data.get("itemType", book.item_type))
     if item_type not in ItemType.values:
         return Response({"message":"Invalid item type"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -184,7 +216,7 @@ def edit_book(request):
     return Response ({"message":"Book Successfully Edited"}, status=status.HTTP_200_OK)
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminRole])
 def remove_book(request):
     book_id = _requested_book_id(request)
 
@@ -280,13 +312,11 @@ def remove_copy(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def borrow_book(request):
-    id_number = request.data.get("id_number")
     book_id = _requested_book_id(request)
 
-    try:
-        user = UserProfile.objects.get(id_number=id_number)
-    except UserProfile.DoesNotExist:
-        return Response({"message":"User not found"}, status=status.HTTP_404_NOT_FOUND)
+    user, error = _borrower_profile(request, "id_number", "You can only borrow for yourself")
+    if error:
+        return error
 
     if book_id is None:
         return _missing_book_id()
@@ -322,12 +352,9 @@ def borrow_book(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def get_user_borrowed_books(request):
-    id_number = request.data.get("id")
-
-    try:
-        user = UserProfile.objects.get(id_number=id_number)
-    except UserProfile.DoesNotExist:
-        return Response({"message":"User not found"}, status=status.HTTP_404_NOT_FOUND)
+    user, error = _borrower_profile(request, "id", "You can only view your own loans")
+    if error:
+        return error
 
     borrowed_books = BorrowRecords.objects.filter(user=user, return_date__isnull=True).select_related("copy__book")
     serializer = UserBorrowRecordSerializer(borrowed_books, many=True)
@@ -338,6 +365,10 @@ def get_user_borrowed_books(request):
 @permission_classes([IsAuthenticated])
 def get_all_borrowed_books(request):
     records = BorrowRecords.objects.filter(user__user__isnull=False).select_related("user__user", "copy__book")
+    if not _is_admin(request):
+        # Students see only their own loans; an account with no profile has none.
+        own = _own_profile(request)
+        records = records.filter(user=own) if own else records.none()
     serializer = AllBorrowRecordSerializer(records, many=True)
 
     return Response({
@@ -348,11 +379,9 @@ def get_all_borrowed_books(request):
 # TO FIX
 # You can do this in frontend
 # Just export the table contents
-@csrf_exempt
+@api_view(["GET"])
+@permission_classes([IsAuthenticated, IsAdminRole])
 def export_borrowed_books_csv(request):
-    if request.method != 'GET':
-        return JsonResponse({'status': 'failed', 'message': 'Invalid request method'})
-
     try:
         records = BorrowRecords.objects.filter(
             user__user__isnull=False
@@ -411,8 +440,10 @@ def export_borrowed_books_csv(request):
         response['Content-Disposition'] = f'attachment; filename="borrowed_books_{current_date}.csv"'
         return response
 
-    except Exception as e:
-        return JsonResponse({"status": "failed", "message": "CSV export failed", "error": str(e)})
+    except Exception:
+        # Logged for us; the client never sees internals.
+        logger.exception("CSV export failed")
+        return Response({"message": "CSV export failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 def _requested_loan_id(request):
     """Several borrowers can hold copies of one title, so a loan is identified by its own id."""
@@ -422,7 +453,7 @@ def _missing_loan_id():
     return Response({"message": "Missing loan_id"}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(["PUT"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminRole])
 def accept_borrowed_book(request):
     loan_id = _requested_loan_id(request)
     if loan_id is None:
@@ -448,7 +479,7 @@ def accept_borrowed_book(request):
         }, status=status.HTTP_200_OK);
 
 @api_view(["PUT"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminRole])
 def return_book(request):
     loan_id = _requested_loan_id(request)
     if loan_id is None:
@@ -477,13 +508,14 @@ def cancel_borrowed_book(request):
     if loan_id is None:
         return _missing_loan_id()
 
-    book = BorrowRecords.objects.filter(
-        pk=loan_id,
-        return_date__isnull=True,
-        status=StatusChoices.PENDING
-    ).first()
+    book = BorrowRecords.objects.filter(pk=loan_id).first()
 
-    if not book:
+    # Ownership before status, so a student cannot probe the state of other people's loans.
+    # A profile's primary key is its login's, so the owner's loan has user_id == request.user.pk.
+    if book and not _is_admin(request) and book.user_id != request.user.pk:
+        return Response({"message": "You can only cancel your own request"}, status=status.HTTP_403_FORBIDDEN)
+
+    if not book or book.return_date is not None or book.status != StatusChoices.PENDING:
         return Response({"message": "No active book found"}, status=status.HTTP_404_NOT_FOUND)
 
     book.status = StatusChoices.CANCELLED

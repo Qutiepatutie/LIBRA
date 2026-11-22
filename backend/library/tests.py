@@ -43,6 +43,16 @@ class DashboardTestCase(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(self.user)
 
+    def client_for(self, user):
+        client = APIClient()
+        client.force_authenticate(user)
+        return client
+
+    def desk_client(self):
+        # Desk and catalog endpoints are admin only.
+        desk = UserLogin.objects.create_user('desk@example.com', 'test-password', role=RoleChoices.ADMIN)
+        return self.client_for(desk)
+
     def make_book(self, call_number, **fields):
         # Like addBook/, a new title starts with copy 1.
         book = Books.objects.create(
@@ -277,10 +287,11 @@ class UserDashboardAPITests(DashboardTestCase):
     def test_checkout_and_return_store_library_local_dates(self):
         loan = self.loan(status=StatusChoices.PENDING, borrow_date=None, due_date=None)
         payload = {'loan_id': loan.pk}
+        desk = self.desk_client()
         # UTC Oct 6, but the library has already reached Oct 7.
         checkout = datetime(2026, 10, 6, 16, 30, tzinfo=datetime_timezone.utc)
         with patch('django.utils.timezone.now', return_value=checkout):
-            response = self.client.put(reverse('accept_borrowed_book'), payload)
+            response = desk.put(reverse('accept_borrowed_book'), payload)
         self.assertEqual(response.status_code, 200)
         loan.refresh_from_db()
         self.assertEqual(loan.due_date, date(2026, 10, 14))
@@ -288,7 +299,7 @@ class UserDashboardAPITests(DashboardTestCase):
         LoanFine.objects.create(loan=loan, amount_assessed='25.00')
         returned = datetime(2026, 10, 14, 16, 30, tzinfo=datetime_timezone.utc)
         with patch('django.utils.timezone.now', return_value=returned):
-            response = self.client.put(reverse('return_book'), {**payload, 'action': 'return'})
+            response = desk.put(reverse('return_book'), {**payload, 'action': 'return'})
             data = self.analytics()
         self.assertEqual(response.status_code, 200)
         loan.refresh_from_db()
@@ -455,14 +466,20 @@ class ItemIdentityTests(DashboardTestCase):
         self.make_copy(thesis)
         return thesis
 
-    def post(self, endpoint, payload):
-        return self.client.post(reverse(endpoint), payload, format='json')
+    def setUp(self):
+        super().setUp()
+        self.desk = self.desk_client()
 
-    def put(self, endpoint, payload):
-        return self.client.put(reverse(endpoint), payload, format='json')
+    def post(self, endpoint, payload, client=None):
+        return (client or self.desk).post(reverse(endpoint), payload, format='json')
+
+    def put(self, endpoint, payload, client=None):
+        return (client or self.desk).put(reverse(endpoint), payload, format='json')
 
     def borrow(self, book, profile=None):
-        return self.post('borrow_book', {'id_number': (profile or self.profile).id_number, 'book_id': book.pk})
+        profile = profile or self.profile
+        return self.post('borrow_book', {'id_number': profile.id_number, 'book_id': book.pk},
+                         self.client_for(profile.user))
 
     def test_two_theses_without_isbn_can_be_added(self):
         self.assertEqual(self.post('add_book', self.thesis_data('T 001.A 2026')).status_code, 201)
@@ -582,7 +599,9 @@ class CopyAPITestCase(DashboardTestCase):
         return (client or self.client).put(reverse(endpoint), payload, format='json')
 
     def borrow(self, book, profile=None):
-        return self.post('borrow_book', {'id_number': (profile or self.profile).id_number, 'book_id': book.pk})
+        profile = profile or self.profile
+        return self.post('borrow_book', {'id_number': profile.id_number, 'book_id': book.pk},
+                         self.client_for(profile.user))
 
     def book_data(self, call_number, **changes):
         values = dict(call_number=call_number, isbn='', item_type=ItemType.THESIS, title=f'Thesis {call_number}',
@@ -631,7 +650,7 @@ class CatalogCopyTests(CopyAPITestCase):
 
     def test_add_book_creates_title_and_copy_one(self):
         response = self.post('add_book', self.book_data('T 10', accession_number='ACC-10',
-                                                         date_acquired='2026-01-05', condition='damaged'))
+                                                         date_acquired='2026-01-05', condition='damaged'), self.admin)
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(response.data, {'message': 'Book Successfully Added!'})
         copy = BookCopy.objects.get(book__call_number='T 10')
@@ -639,7 +658,7 @@ class CatalogCopyTests(CopyAPITestCase):
                          (1, 'ACC-10', '2026-01-05', 'damaged'))
 
     def test_add_book_copy_fields_are_optional(self):
-        self.assertEqual(self.post('add_book', self.book_data('T 11', condition=None)).status_code, 201)
+        self.assertEqual(self.post('add_book', self.book_data('T 11', condition=None), self.admin).status_code, 201)
         copy = BookCopy.objects.get(book__call_number='T 11')
         self.assertEqual((copy.copy_number, copy.accession_number, copy.date_acquired, copy.condition),
                          (1, '', '', 'good'))
@@ -651,22 +670,22 @@ class CatalogCopyTests(CopyAPITestCase):
                  ({'condition': ''}, 'Invalid condition'))
         for fields, message in cases:
             with self.subTest(fields=fields):
-                response = self.post('add_book', self.book_data('T 12', **fields))
+                response = self.post('add_book', self.book_data('T 12', **fields), self.admin)
                 self.assertEqual(response.status_code, 400)
                 self.assertEqual(response.data['message'], message)
                 self.assertFalse(Books.objects.filter(call_number='T 12').exists())
 
     def test_add_book_is_atomic_when_the_copy_cannot_be_saved(self):
         with patch('library.views.CopyFieldsSerializer.save', side_effect=IntegrityError):
-            response = self.post('add_book', self.book_data('T 13'))
+            response = self.post('add_book', self.book_data('T 13'), self.admin)
         self.assertEqual(response.status_code, 400)
         self.assertFalse(Books.objects.filter(call_number='T 13').exists())
 
     def test_add_book_keeps_missing_field_and_unarchive_rules(self):
-        response = self.post('add_book', {'call_number': 'T 14', 'title': 'No author'})
+        response = self.post('add_book', {'call_number': 'T 14', 'title': 'No author'}, self.admin)
         self.assertEqual((response.status_code, response.data['message']), (400, 'Missing important fields'))
         archived = self.make_book('T 15', is_archived=True)
-        response = self.post('add_book', self.book_data('T 15', isbn=''))
+        response = self.post('add_book', self.book_data('T 15', isbn=''), self.admin)
         self.assertEqual((response.status_code, response.data['message']), (200, 'Book Successfully Added!'))
         archived.refresh_from_db()
         self.assertFalse(archived.is_archived)
@@ -677,7 +696,7 @@ class CatalogCopyTests(CopyAPITestCase):
         response = self.put('edit_book', {
             'book_id': self.book.pk, 'title': 'Renamed', 'condition': 'lost', 'date_acquired': '1999',
             'copies': [], 'total_copies': 9, 'available_copies': 9,
-        })
+        }, self.admin)
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data['message'], 'Book Successfully Edited')
         copy.refresh_from_db()
@@ -687,7 +706,7 @@ class CatalogCopyTests(CopyAPITestCase):
         self.assertEqual(self.book.copies.count(), 1)
 
     def test_remove_book_still_archives_the_title(self):
-        response = self.post('remove_book', {'book_id': self.book.pk})
+        response = self.post('remove_book', {'book_id': self.book.pk}, self.admin)
         self.assertEqual((response.status_code, response.data['message']), (200, 'Book successfully removed'))
         self.book.refresh_from_db()
         self.assertTrue(self.book.is_archived)
@@ -867,7 +886,7 @@ class BorrowCopyTests(CopyAPITestCase):
                  ({'id_number': 'reader', 'book_id': archived.pk}, 400, 'Book is archived and cannot be borrowed'))
         for payload, code, message in cases:
             with self.subTest(payload=payload):
-                response = self.post('borrow_book', payload)
+                response = self.post('borrow_book', payload, self.admin)
                 self.assertEqual((response.status_code, response.data['message']), (code, message))
         self.assertFalse(BorrowRecords.objects.exists())
 
@@ -879,9 +898,9 @@ class BorrowCopyTests(CopyAPITestCase):
         response = self.borrow(self.book, self.other)
         self.assertEqual((response.status_code, response.data['copy']['id']), (200, copy.pk))
         loan_id = response.data['loan_id']
-        self.assertEqual(self.put('accept_borrowed_book', {'loan_id': loan_id}).status_code, 200)
+        self.assertEqual(self.put('accept_borrowed_book', {'loan_id': loan_id}, self.admin).status_code, 200)
         self.assertEqual(self.borrow(self.book, self.third).status_code, 400)
-        self.assertEqual(self.put('return_book', {'loan_id': loan_id}).status_code, 200)
+        self.assertEqual(self.put('return_book', {'loan_id': loan_id}, self.admin).status_code, 200)
         response = self.borrow(self.book, self.third)
         self.assertEqual((response.status_code, response.data['copy']['id']), (200, copy.pk))
 
@@ -899,14 +918,14 @@ class LoanByIdTests(CopyAPITestCase):
 
     def test_two_students_with_copies_of_one_title_are_handled_separately(self):
         self.assertNotEqual(self.mine.copy_id, self.theirs.copy_id)
-        response = self.put('accept_borrowed_book', {'loan_id': self.theirs.pk})
+        response = self.put('accept_borrowed_book', {'loan_id': self.theirs.pk}, self.admin)
         self.assertEqual(response.status_code, 200)
         self.theirs.refresh_from_db()
         self.assertEqual(response.data, {'message': 'Borrower Accepted', 'book': {
             'status': StatusChoices.ACTIVE, 'due_date': self.theirs.due_date.isoformat(),
         }})
         self.assertEqual(self.status_of(self.mine), StatusChoices.PENDING)
-        response = self.put('return_book', {'loan_id': self.theirs.pk})
+        response = self.put('return_book', {'loan_id': self.theirs.pk}, self.admin)
         self.assertEqual((response.status_code, response.data), (200, {'message': 'Book returned successfully'}))
         self.assertEqual(self.status_of(self.mine), StatusChoices.PENDING)
         response = self.put('cancel_borrowed_book', {'loan_id': self.mine.pk})
@@ -919,7 +938,7 @@ class LoanByIdTests(CopyAPITestCase):
         for endpoint in ('accept_borrowed_book', 'return_book', 'cancel_borrowed_book'):
             for payload in ({}, {'loan_id': 'abc'}, {'book_id': self.book.pk}):
                 with self.subTest(endpoint=endpoint, payload=payload):
-                    response = self.put(endpoint, payload)
+                    response = self.put(endpoint, payload, self.admin)
                     self.assertEqual((response.status_code, response.data['message']), (400, 'Missing loan_id'))
 
     def test_unknown_loan_or_wrong_status_is_not_found(self):
@@ -930,13 +949,13 @@ class LoanByIdTests(CopyAPITestCase):
                  ('return_book', self.mine.pk, 'No active book found'))
         for endpoint, loan_id, message in cases:
             with self.subTest(endpoint=endpoint, loan_id=loan_id):
-                response = self.put(endpoint, {'loan_id': loan_id})
+                response = self.put(endpoint, {'loan_id': loan_id}, self.admin)
                 self.assertEqual((response.status_code, response.data['message']), (404, message))
-        self.put('accept_borrowed_book', {'loan_id': self.mine.pk})
+        self.put('accept_borrowed_book', {'loan_id': self.mine.pk}, self.admin)
         for endpoint, message in (('accept_borrowed_book', 'Book not found'),
                                   ('cancel_borrowed_book', 'No active book found')):
             with self.subTest(endpoint=endpoint, status='Active'):
-                response = self.put(endpoint, {'loan_id': self.mine.pk})
+                response = self.put(endpoint, {'loan_id': self.mine.pk}, self.admin)
                 self.assertEqual((response.status_code, response.data['message']), (404, message))
         self.assertEqual(self.status_of(self.mine), StatusChoices.ACTIVE)
 
@@ -950,7 +969,7 @@ class LoanListingTests(CopyAPITestCase):
         self.record = self.loan(copy=self.copy)
 
     def test_all_borrowed_books_add_loan_id_and_copy_ref(self):
-        rows = self.client.get(reverse('get_all_borrowed_books')).data['data']
+        rows = self.admin.get(reverse('get_all_borrowed_books')).data['data']
         self.assertEqual(len(rows), 1)
         row = rows[0]
         self.assertEqual(row['id'], self.record.pk)
@@ -971,8 +990,176 @@ class LoanListingTests(CopyAPITestCase):
                          (self.record.pk, self.book.pk, 1, 'ACC-1'))
 
     def test_csv_export_appends_copy_columns(self):
-        response = self.client.get(reverse('export_borrowed_books_csv'))
+        response = self.admin.get(reverse('export_borrowed_books_csv'))
         self.assertEqual(response.status_code, 200)
         rows = list(csv.reader(io.StringIO(response.content.decode())))
         self.assertEqual(rows[0][-5:], ['Book Title', 'ISBN', 'Call Number', 'Copy Number', 'Accession Number'])
         self.assertEqual(rows[1][-5:], [self.book.title, '', self.book.call_number, '1', 'ACC-1'])
+
+
+class EndpointAccessTests(CopyAPITestCase):
+    """The caller comes from the JWT; an id in the body never picks someone else's loans."""
+
+    def setUp(self):
+        super().setUp()
+        self.anonymous = APIClient()
+        self.no_profile = self.client_for(UserLogin.objects.create_user('noprofile@example.com', 'test-password'))
+        self.make_copy(self.book)
+
+    def pending(self, profile):
+        return self.loan(user=profile, status=StatusChoices.PENDING, borrow_date=None, due_date=None)
+
+    def status_of(self, loan):
+        loan.refresh_from_db()
+        return loan.status
+
+    def post_form(self, endpoint, payload, client=None):
+        # addBook takes multipart form data (it accepts a cover image upload).
+        return (client or self.client).post(reverse(endpoint), payload, format='multipart')
+
+    def test_catalog_and_desk_endpoints_are_admin_only(self):
+        loan = self.pending(self.profile)
+        spare = self.make_book('T 40')
+        calls = (('add_book', self.post_form, self.book_data('T 41'), 201),
+                 ('edit_book', self.put, {'book_id': self.book.pk, 'title': 'Renamed'}, 200),
+                 ('remove_book', self.post, {'book_id': spare.pk}, 200),
+                 ('accept_borrowed_book', self.put, {'loan_id': loan.pk}, 200),
+                 ('return_book', self.put, {'loan_id': loan.pk}, 200))
+        for endpoint, send, payload, _ in calls:
+            with self.subTest(endpoint=endpoint):
+                self.assertEqual(send(endpoint, payload, self.anonymous).status_code, 401)
+                self.assertEqual(send(endpoint, payload).status_code, 403)
+        self.assertFalse(Books.objects.filter(call_number='T 41').exists())
+        self.book.refresh_from_db()
+        spare.refresh_from_db()
+        self.assertEqual((self.book.title, spare.is_archived, self.status_of(loan)),
+                         (f'Book {self.book.call_number}', False, StatusChoices.PENDING))
+        for endpoint, send, payload, code in calls:
+            with self.subTest(endpoint=endpoint, caller='admin'):
+                self.assertEqual(send(endpoint, payload, self.admin).status_code, code)
+        self.assertEqual(self.status_of(loan), StatusChoices.RETURNED)
+
+    def test_csv_export_is_admin_only_and_unchanged(self):
+        self.loan()
+        url = reverse('export_borrowed_books_csv')
+        self.assertEqual(self.anonymous.get(url).status_code, 401)
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.assertEqual(self.admin.post(url).status_code, 405)
+        response = self.admin.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'text/csv')
+        self.assertEqual(response['Content-Disposition'], 'attachment; filename="borrowed_books_2026_10_07_1200.csv"')
+        rows = list(csv.reader(io.StringIO(response.content.decode())))
+        self.assertEqual(rows[0], [
+            'Record ID', 'Status', 'Borrow Date', 'Due Date', 'Return Date', 'User ID Number', 'First Name',
+            'Middle Name', 'Last Name', 'Email', 'Program', 'Book Title', 'ISBN', 'Call Number', 'Copy Number',
+            'Accession Number',
+        ])
+        self.assertEqual(len(rows), 2)
+
+    def test_csv_export_failure_hides_the_exception_text(self):
+        with patch('library.views.csv.writer', side_effect=RuntimeError('secret internals')), \
+                self.assertLogs('library.views', 'ERROR'):
+            response = self.admin.get(reverse('export_borrowed_books_csv'))
+        self.assertEqual((response.status_code, response.data), (500, {'message': 'CSV export failed'}))
+        self.assertNotIn(b'secret internals', response.content)
+
+    def test_borrow_is_for_the_caller_unless_an_admin_names_the_borrower(self):
+        payload = {'book_id': self.book.pk}
+        self.assertEqual(self.post('borrow_book', payload, self.anonymous).status_code, 401)
+        response = self.post('borrow_book', {**payload, 'id_number': 'other'})
+        self.assertEqual((response.status_code, response.data['message']), (403, 'You can only borrow for yourself'))
+        self.assertFalse(BorrowRecords.objects.exists())
+        response = self.post('borrow_book', payload)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(BorrowRecords.objects.get(pk=response.data['loan_id']).user, self.profile)
+        response = self.post('borrow_book', {**payload, 'id_number': 'other'}, self.admin)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(BorrowRecords.objects.get(pk=response.data['loan_id']).user, self.other)
+
+    def test_borrow_without_a_resolvable_borrower_is_user_not_found(self):
+        payload = {'book_id': self.book.pk}
+        # The admin account has no profile of its own.
+        for client, body in ((self.admin, payload), (self.no_profile, payload),
+                             (self.admin, {**payload, 'id_number': 'nobody'})):
+            with self.subTest(body=body):
+                response = self.post('borrow_book', body, client)
+                self.assertEqual((response.status_code, response.data['message']), (404, 'User not found'))
+        response = self.post('borrow_book', {**payload, 'id_number': 'other'}, self.no_profile)
+        self.assertEqual((response.status_code, response.data['message']), (403, 'You can only borrow for yourself'))
+        self.assertFalse(BorrowRecords.objects.exists())
+
+    def test_user_borrowed_books_are_the_callers_unless_an_admin_asks(self):
+        mine, theirs = self.loan(), self.loan(user=self.other)
+
+        def ids(body, client=None):
+            response = self.post('get_user_borrowed_books', body, client)
+            self.assertEqual(response.status_code, 200, response.data)
+            return [row['id'] for row in response.data['books']]
+
+        self.assertEqual(self.post('get_user_borrowed_books', {}, self.anonymous).status_code, 401)
+        self.assertEqual(ids({}), [mine.pk])
+        self.assertEqual(ids({'id': 'reader'}), [mine.pk])
+        response = self.post('get_user_borrowed_books', {'id': 'other'})
+        self.assertEqual((response.status_code, response.data['message']), (403, 'You can only view your own loans'))
+        self.assertEqual(ids({'id': 'other'}, self.admin), [theirs.pk])
+        for client, body in ((self.admin, {}), (self.admin, {'id': 'nobody'}), (self.no_profile, {})):
+            with self.subTest(body=body):
+                response = self.post('get_user_borrowed_books', body, client)
+                self.assertEqual((response.status_code, response.data['message']), (404, 'User not found'))
+
+    def test_all_borrowed_books_are_scoped_for_non_admins(self):
+        mine, theirs = self.loan(), self.loan(user=self.other)
+        url = reverse('get_all_borrowed_books')
+
+        def ids(client):
+            response = client.get(url)
+            self.assertEqual((response.status_code, response.data['message']),
+                             (200, 'Borrowed books fetched successfully'))
+            return sorted(row['id'] for row in response.data['data'])
+
+        self.assertEqual(self.anonymous.get(url).status_code, 401)
+        self.assertEqual(ids(self.client), [mine.pk])
+        self.assertEqual(ids(self.client_for(self.other_user)), [theirs.pk])
+        self.assertEqual(ids(self.no_profile), [])
+        self.assertEqual(ids(self.admin), sorted([mine.pk, theirs.pk]))
+
+    def test_cancel_is_for_the_owner_or_an_admin(self):
+        mine, theirs, third = self.pending(self.profile), self.pending(self.other), self.pending(self.third)
+        self.assertEqual(self.put('cancel_borrowed_book', {'loan_id': mine.pk}, self.anonymous).status_code, 401)
+        for client in (self.client, self.no_profile):
+            response = self.put('cancel_borrowed_book', {'loan_id': theirs.pk}, client)
+            self.assertEqual((response.status_code, response.data['message']),
+                             (403, 'You can only cancel your own request'))
+        self.assertEqual(self.status_of(theirs), StatusChoices.PENDING)
+        self.assertEqual(self.put('cancel_borrowed_book', {'loan_id': mine.pk}).status_code, 200)
+        self.assertEqual(self.put('cancel_borrowed_book', {'loan_id': theirs.pk},
+                                  self.client_for(self.other_user)).status_code, 200)
+        self.assertEqual(self.put('cancel_borrowed_book', {'loan_id': third.pk}, self.admin).status_code, 200)
+        self.assertEqual({self.status_of(loan) for loan in (mine, theirs, third)}, {StatusChoices.CANCELLED})
+
+    def test_cancel_refuses_someone_elses_loan_whatever_its_status(self):
+        theirs, mine = self.loan(user=self.other), self.loan()
+        response = self.put('cancel_borrowed_book', {'loan_id': theirs.pk})
+        self.assertEqual((response.status_code, response.data['message']), (403, 'You can only cancel your own request'))
+        for client, loan_id in ((self.admin, theirs.pk), (self.client, mine.pk), (self.client, 999999)):
+            with self.subTest(loan_id=loan_id):
+                response = self.put('cancel_borrowed_book', {'loan_id': loan_id}, client)
+                self.assertEqual((response.status_code, response.data['message']), (404, 'No active book found'))
+        self.assertEqual((self.status_of(theirs), self.status_of(mine)), (StatusChoices.ACTIVE, StatusChoices.ACTIVE))
+
+    def test_edit_book_reads_item_type_and_still_accepts_item_type_camel_case(self):
+        cases = (({'item_type': ItemType.THESIS}, ItemType.THESIS),
+                 ({'itemType': ItemType.BOOK}, ItemType.BOOK),
+                 ({'item_type': ItemType.THESIS, 'itemType': ItemType.BOOK}, ItemType.THESIS))
+        for fields, expected in cases:
+            with self.subTest(fields=fields):
+                response = self.put('edit_book', {'book_id': self.book.pk, **fields}, self.admin)
+                self.assertEqual(response.status_code, 200, response.data)
+                self.book.refresh_from_db()
+                self.assertEqual(self.book.item_type, expected)
+        response = self.put('edit_book', {'book_id': self.book.pk, 'item_type': 'bogus', 'itemType': ItemType.THESIS},
+                            self.admin)
+        self.assertEqual((response.status_code, response.data['message']), (400, 'Invalid item type'))
+        self.book.refresh_from_db()
+        self.assertEqual(self.book.item_type, ItemType.THESIS)
