@@ -8,23 +8,23 @@
 
 **Tech Stack:** Django 5 + Django REST Framework, PostgreSQL, scikit-learn 1.9.1, React (Vite).
 
-**Spec:** `docs/superpowers/specs/2026-11-14-tfidf-recommender-design.md`. Section 15 (amendments) overrides earlier sections. Read it before starting.
+**Spec:** `docs/superpowers/specs/2026-11-14-tfidf-recommender-design.md`. Sections 15 and 16 (amendments) override earlier sections; where they disagree, section 16 wins. Read it before starting.
 
 ## Global Constraints
 
-- **Base:** the work stacks on `feat/book-copy` (PR #15). If PR #15 is already merged, use `origin/main` instead. Task 0 sets this up.
+- **Base:** `origin/main` (PR #15, the BookCopy split, is merged there as `f9c901e`). Task 0 sets this up.
 - **Execution method (chosen by the user):** subagents do the coding; the main conversation only coordinates and reports.
 - **Never touch the live database.** The main checkout's `backend/.env` points at live Supabase. Run every `manage.py` command with `--settings=recommender_pg` (Task 0). Never run `migrate` or `test` with default settings.
 - **Test command prefix**, written `TEST` in this plan, run from `backend/` in the worktree:
   `PYTHONPATH="C:/github25/recommender-test-settings" RECOMMENDER_AGENT=<tag> C:/github25/bookly-lms/backend/venv/Scripts/python.exe manage.py test --settings=recommender_pg --noinput`
   Each parallel worker uses its own `<tag>` (it names the test database).
 - `scikit-learn==1.9.1`. Vectorizer is exactly `TfidfVectorizer(stop_words=STOP_WORDS, min_df=2)`; every other parameter stays at its default.
-- Constants: top 12 saved per title, at most 4 served, at most 3 reason terms, default τ `0.10`.
+- Constants: top 12 saved per title, at most 4 served, at most 3 reason terms, at most 15 tags per item, default τ `0.10`, Dewey granularity = division (tens).
 - No Django signals. Rebuilds are explicit calls.
-- UI: do not edit any existing CSS file; reuse only colors, fonts and spacing already used in `showbook.module.css`. The UI commit merges only after the designer signs off.
+- UI: use the designer's existing recommendation slot in `ShowBook.jsx` and the existing `BookPanel` card; create no CSS file and edit no existing CSS file. The UI commit merges only after the designer signs off.
 - Judging sheets and the school's thesis file contain student names: never write them inside the repository, never commit them.
 - The GitHub repository is public: keep security details out of commit messages and PR text.
-- Do not modify `frontend/src/components/ui/dashboard/graphs/Heatmap.jsx`, `docs/reports/`, or `seed_data.py` (git-ignored).
+- Do not modify `frontend/src/components/ui/dashboard/graphs/Heatmap.jsx`, `.gitignore`, `docs/reports/`, `docs/Data import libra/` or `seed_data.py` (git-ignored). The school's data files in `docs/Data import libra/` contain student names: read them only if a task says so, never copy them into the repository.
 - Commit messages: plain imperative sentences, no attribution lines.
 
 ## Review Focus
@@ -42,7 +42,8 @@ Inputs the spec implies but does not spell out. Each has a test in the task name
 | Path | Responsibility |
 |---|---|
 | `backend/library/recommender/__init__.py` | package marker |
-| `backend/library/recommender/stopwords.py` | the four custom word lists and `STOP_WORDS` |
+| `backend/library/recommender/stopwords.py` | the five custom word lists and `STOP_WORDS` |
+| `backend/library/recommender/dewey.py` | Dewey division names and the call-number → subject token rule |
 | `backend/library/recommender/preprocess.py` | pure text rules; no database, no scikit-learn |
 | `backend/library/recommender/build.py` | vectorizer config, catalog loading, `rebuild_recommendations()` |
 | `backend/library/recommender/serve.py` | τ lookup and `recommendations_for()` |
@@ -54,9 +55,9 @@ Inputs the spec implies but does not spell out. Each has a test in the task name
 | `backend/library/test_recommender_*.py` | tests, one file per task |
 | `backend/RECOMMENDER.md` | operations notes (same style as `ADMIN_ANALYTICS.md`) |
 | `frontend/src/api/books.js` | `getRecommendations` |
-| `frontend/src/components/library/showbook/useRecommendations.js`, `RecommendedRow.jsx`, `RecommendedCard.jsx` | the row |
-| `frontend/src/styles/library/showBook/recommended.module.css` | the row's own styles |
-| `docs/recommender-designer-handoff.md` | what the designer needs to restyle the row |
+| `backend/books/views.py` | autofill: description from the work record, tag cap |
+| `frontend/src/components/library/showbook/useRecommendations.js`, `RecommendedBooks.jsx` | data hook and the cards inside the designer's slot |
+| `docs/recommender-designer-handoff.md` | what the designer needs to finish the slot |
 
 ---
 
@@ -66,7 +67,7 @@ Inputs the spec implies but does not spell out. Each has a test in the task name
 - Create (outside the repo): `C:/github25/recommender-test-settings/recommender_pg.py`
 
 **Interfaces:**
-- Produces: worktree `C:/github25/bookly-lms-recommender` on `feat/tfidf-recommender` rebased onto `feat/book-copy`; the `TEST` command.
+- Produces: worktree `C:/github25/bookly-lms-recommender` on `feat/tfidf-recommender` rebased onto `origin/main`; the `TEST` command.
 
 - [ ] **Step 1: Create the worktree.** The branch is checked out in the main checkout, which has an uncommitted `Heatmap.jsx` change and an untracked `docs/reports/`. Both must survive.
 
@@ -76,10 +77,10 @@ git switch main            # carries the uncommitted Heatmap.jsx change along; s
 git worktree add ../bookly-lms-recommender feat/tfidf-recommender
 cd ../bookly-lms-recommender
 git fetch origin
-git rebase feat/book-copy  # use origin/main instead if PR #15 is merged (git branch -r --merged origin/main | grep book-copy)
+git rebase origin/main
 ```
 
-Expected: rebase succeeds with no conflicts (the branch only adds files under `docs/superpowers/`). `git log --oneline -6` shows the four docs commits on top of `Split books into titles and physical copies`.
+Expected: rebase succeeds with no conflicts (the branch only adds files under `docs/superpowers/`). `git log --oneline -8` shows the docs commits on top of origin/main's latest commit.
 
 - [ ] **Step 2: Create the settings module** with exactly this content:
 
@@ -100,14 +101,14 @@ DATABASES = {'default': {
 
 - [ ] **Step 4: Install scikit-learn into the shared venv.** `C:/github25/bookly-lms/backend/venv/Scripts/python.exe -m pip install scikit-learn==1.9.1`. Expected: `Successfully installed` including numpy and scipy.
 
-- [ ] **Step 5: Baseline.** Run `TEST library`. Expected: all tests pass (158 on `feat/book-copy`). Record the count; if any fail, stop and report before changing code.
+- [ ] **Step 5: Baseline.** Run `TEST library books`. Expected: all tests pass. Record the count; if any fail, stop and report before changing code.
 
 ---
 
 ### Task 1: Stop words and preprocessing
 
 **Files:**
-- Create: `backend/library/recommender/__init__.py` (empty), `stopwords.py`, `preprocess.py`
+- Create: `backend/library/recommender/__init__.py` (empty), `stopwords.py`, `dewey.py`, `preprocess.py`
 - Modify: `backend/requirements.txt` (UTF-16 LE with BOM and CRLF: keep that encoding), `backend/dev-requirements.txt` (ASCII): add `scikit-learn==1.9.1` to both
 - Test: `backend/library/test_recommender_preprocess.py` (`django.test.SimpleTestCase`)
 
@@ -117,8 +118,13 @@ DATABASES = {'default': {
   - `FILIPINO_WORDS = frozenset({"ang","ng","sa","mga","na","at","ay","ito","para","kung","si","ni","kay","nang","pa"})`
   - `THESIS_TITLE_WORDS = frozenset({"selected","level","basis","evaluation","assessment","determination","implementation","development","impact","based","iii"})`
   - `PLACE_WORDS = frozenset({"city","pampanga","bulacan","angeles","san","marilao","region","province","district","caloocan"})`
-  - `STOP_WORDS: list[str]` = sorted union of the four sets and `sklearn.feature_extraction.text.ENGLISH_STOP_WORDS`
-  - A comment above `THESIS_TITLE_WORDS` and `PLACE_WORDS` records the title counts from spec section 4.7.
+  - `BOOK_TITLE_WORDS = frozenset({"guide","introduction","principles","basic","applications","approach","fundamentals","concepts","practice","essentials","applied","volume","part"})`
+  - `STOP_WORDS: list[str]` = sorted union of the five sets and `sklearn.feature_extraction.text.ENGLISH_STOP_WORDS`
+  - A comment above `THESIS_TITLE_WORDS`, `PLACE_WORDS` and `BOOK_TITLE_WORDS` records the title counts from spec sections 4.7 and 16.2.
+- Produces, in `dewey.py`:
+  - `DEWEY_DIVISIONS: dict[str, str]`: all 100 divisions `"000"` … `"990"` with their names from OCLC's DDC 23 second summary (e.g. `"000": "Computer science, knowledge & systems"`, `"150": "Psychology"`, `"340": "Law"`, `"370": "Education"`, `"610": "Medicine & health"`, `"650": "Management & public relations"`). A comment says the team verifies the table against OCLC's published summaries.
+  - `SPECIAL_COLLECTIONS = {"FIC": ("ddc_fic", "Fiction"), "RIZ": ("ddc_riz", "Rizaliana"), "BIO": ("ddc_bio", "Biography"), "B": ("ddc_bio", "Biography"), "FB": ("ddc_bio", "Biography")}`
+  - `subject_token(call_number) -> tuple[str, str] | None`: the first match of `\b(\d{3})(?:\.\d+)?\b` gives `("ddc_" + division, DEWEY_DIVISIONS[division])` where `division = digits[:2] + "0"`; with no match, the first whitespace-separated word (uppercased) looked up in `SPECIAL_COLLECTIONS`; otherwise `None`. Non-strings give `None`.
 - Produces, in `preprocess.py`:
   - `clean_text(value) -> str`
   - `clean_tags(tags) -> list[str]`
@@ -126,7 +132,8 @@ DATABASES = {'default': {
   - `work_key(title, author) -> tuple[str, tuple[str, ...]]`
   - `program_subjects(raw) -> list[str]`
   - `@dataclass(frozen=True) class Document: text: str; work_key: tuple; labels: dict[str, str]; description_length: int`
-  - `prepare(title, author, tags, description) -> Document`
+  - `MAX_TAGS = 15`
+  - `prepare(title, author, tags, description, call_number="") -> Document`
 
 Rules the tests do not fully determine (use these exact patterns):
 
@@ -148,11 +155,11 @@ DEGREE_PREFIX = re.compile(
 ```
 
 - `clean_text`: `""` for `None`, a non-string, or a placeholder; otherwise the stripped string.
-- `clean_tags`: a string counts as one tag; any other non-list gives `[]`; non-string members are skipped. Per tag: cut at the first control character (Unicode category `Cc`) and strip; drop placeholders, call-number matches, tags containing `_`, and tags with any letter whose Unicode name does not contain `LATIN`; de-duplicate ignoring case, keeping the first spelling.
-- `author_tokens`: split with `AUTHOR_SPLIT`; a part matching `ET_AL` gives nothing; with a comma, use `parts[1] + " " + parts[0]` and ignore later parts; strip accents (NFKD, drop combining marks); replace non-alphanumerics with spaces; drop one-character words; token = lowercase words joined by `_`, label = the words title-cased and joined by spaces.
+- `clean_tags`: a string counts as one tag; any other non-list gives `[]`; non-string members are skipped. Per tag: cut at the first control character (Unicode category `Cc`) and strip; drop placeholders, call-number matches, tags containing `_`, and tags with any letter whose Unicode name does not contain `LATIN`; de-duplicate ignoring case, keeping the first spelling; keep the first `MAX_TAGS`.
+- `author_tokens`: split with `AUTHOR_SPLIT`; remove `ET_AL` matches from each part; with a comma, use `parts[1] + " " + parts[0]` and ignore later parts; strip accents (NFKD, drop combining marks); replace non-alphanumerics with spaces; drop one-character words; a part left with fewer than two words gives no token; token = lowercase words joined by `_`, label = the words title-cased and joined by spaces.
 - `work_key`: title lowercased, accents stripped, `EDITION_SUFFIX` removed, non-alphanumerics to spaces, spaces collapsed; second element is the sorted author tokens.
 - `program_subjects`: apply `PROGRAM_FIXES` (case-insensitive), remove `NON_THESIS`, split with `MAJOR_SPLIT`, strip `DEGREE_PREFIX` from the first part, strip `" ,"`, drop empties.
-- `prepare`: `text` = title, author tokens, cleaned tags and description joined by single spaces (empty parts omitted); `labels` = the author token map; `description_length` = `len(clean_text(description))`.
+- `prepare`: `text` = the title with `EDITION_SUFFIX` removed, the author tokens, the cleaned tags, the subject token from `subject_token(call_number)` and the description, joined by single spaces (empty parts omitted); `labels` = the author token map plus `{subject token: subject label}`; `description_length` = `len(clean_text(description))`.
 
 - [ ] **Step 1: Write the failing tests** in `test_recommender_preprocess.py`:
 
@@ -171,6 +178,8 @@ class CleanTagsTests(SimpleTestCase):
         self.assertEqual(clean_tags(tags), ["Compilers", "Programmation parallèle"])
     def test_control_character_cuts_the_tag(self):
         self.assertEqual(clean_tags(["Philosophy, Jewish.\u001e 0"]), ["Philosophy, Jewish."])
+    def test_at_most_fifteen_tags(self):
+        self.assertEqual(clean_tags([f"Subject {n}" for n in range(176)]), [f"Subject {n}" for n in range(15)])
     def test_non_list_values(self):                       # Review Focus 1
         self.assertEqual(clean_tags(None), [])
         self.assertEqual(clean_tags(5), [])
@@ -187,6 +196,12 @@ class AuthorTokenTests(SimpleTestCase):
                          ["andy_hunt", "dave_thomas", "ana_cruz", "li_wei"])
     def test_et_al_gives_no_token(self):
         self.assertEqual(author_tokens("Quilantang, et al."), {})
+    def test_full_name_before_et_al_is_kept(self):
+        self.assertEqual(author_tokens("Masaaki Mitani et al."), {"masaaki_mitani": "Masaaki Mitani"})
+    def test_real_multi_author_formats(self):
+        self.assertEqual(list(author_tokens("Clark, Alexander & Sousa, Bailey")), ["alexander_clark", "bailey_sousa"])
+        self.assertEqual(list(author_tokens("Gopee, Niel and Galloway, Jo")), ["niel_gopee", "jo_galloway"])
+        self.assertEqual(list(author_tokens("Brinkmann, Svend,")), ["svend_brinkmann"])
     def test_credentials_after_second_comma_ignored(self):
         self.assertEqual(list(author_tokens("Daluyong, Mirasol T. Abrenica, MD, FPCP")), ["mirasol_abrenica_daluyong"])
     def test_accents_and_missing_author(self):
@@ -221,11 +236,35 @@ class ProgramSubjectTests(SimpleTestCase):
         for raw, expected in cases.items():
             self.assertEqual(program_subjects(raw), expected, raw)
 
+class SubjectTokenTests(SimpleTestCase):
+    def test_real_call_numbers(self):
+        cases = {
+            "001.4 K96 2019": ("ddc_000", "Computer science, knowledge & systems"),
+            "F 346.59902 D71 2023": ("ddc_340", "Law"),
+            "MT 362.11 V82 2020": ("ddc_360", DEWEY_DIVISIONS["360"]),
+            "D 658 A2 2021": ("ddc_650", "Management & public relations"),
+            "TH 615 P43t 2023": ("ddc_610", "Medicine & health"),
+            "FR 150 A1 2020": ("ddc_150", "Psychology"),
+            "FIC D64 2001 bk.1": ("ddc_fic", "Fiction"),
+            "RIZ B41 2016": ("ddc_riz", "Rizaliana"),
+            "FB A2 2016": ("ddc_bio", "Biography"),
+            "B G85 2007": ("ddc_bio", "Biography"),
+        }
+        for call, expected in cases.items():
+            self.assertEqual(subject_token(call), expected, call)
+    def test_no_subject(self):
+        for call in ("", None, 5, "X 12 A1", "00"):
+            self.assertIsNone(subject_token(call))
+    def test_all_hundred_divisions_are_named(self):
+        self.assertEqual(sorted(DEWEY_DIVISIONS), [f"{n:03d}" for n in range(0, 1000, 10)])
+        self.assertTrue(all(name.strip() for name in DEWEY_DIVISIONS.values()))
+
 class PrepareTests(SimpleTestCase):
     def test_document_text_and_labels(self):
-        doc = prepare("Compilers", "Aho, Alfred V.", ["Compilers", "005.4/53"], "Parsing and code generation")
-        self.assertEqual(doc.text, "Compilers alfred_aho Compilers Parsing and code generation")
-        self.assertEqual(doc.labels, {"alfred_aho": "Alfred Aho"})
+        doc = prepare("Compilers, 2nd ed.", "Aho, Alfred V.", ["Compilers", "005.4/53"], "Parsing and code generation",
+                      "005.453 A28 2007")
+        self.assertEqual(doc.text, "Compilers alfred_aho Compilers ddc_000 Parsing and code generation")
+        self.assertEqual(doc.labels, {"alfred_aho": "Alfred Aho", "ddc_000": "Computer science, knowledge & systems"})
         self.assertEqual(doc.description_length, len("Parsing and code generation"))
     def test_empty_fields_add_nothing(self):                # Review Focus 1
         doc = prepare("Body Language", None, None, "None")
@@ -234,17 +273,17 @@ class PrepareTests(SimpleTestCase):
 
 class StopWordTests(SimpleTestCase):
     def test_lists_are_combined(self):
-        for word in ("the", "study", "ng", "evaluation", "pampanga"):
+        for word in ("the", "study", "ng", "evaluation", "pampanga", "introduction", "applied"):
             self.assertIn(word, STOP_WORDS)
         self.assertNotIn("feasibility", STOP_WORDS)
         self.assertEqual(STOP_WORDS, sorted(set(STOP_WORDS)))
 ```
 
 - [ ] **Step 2: Run** `TEST library.test_recommender_preprocess`. Expected: import errors (module not found).
-- [ ] **Step 3: Implement** `stopwords.py` and `preprocess.py` per the Interfaces block.
+- [ ] **Step 3: Implement** `stopwords.py`, `dewey.py` and `preprocess.py` per the Interfaces block.
 - [ ] **Step 4: Add the dependency.** Append `scikit-learn==1.9.1` to `dev-requirements.txt`. For `requirements.txt`, read as `utf-16`, append the line with `\r\n`, write back as `utf-16` (Python's `utf-16` codec keeps the BOM). Verify with `file backend/requirements.txt`: still `UTF-16, little-endian`.
 - [ ] **Step 5: Run** `TEST library.test_recommender_preprocess`. Expected: all pass.
-- [ ] **Step 6: Commit.** `git add backend/library/recommender backend/library/test_recommender_preprocess.py backend/requirements.txt backend/dev-requirements.txt` then `git commit -m "Add recommender preprocessing rules and stop words"`.
+- [ ] **Step 6: Commit.** `git add backend/library/recommender backend/library/test_recommender_preprocess.py backend/requirements.txt backend/dev-requirements.txt` then `git commit -m "Add recommender preprocessing rules, stop words and Dewey subjects"`.
 
 ---
 
@@ -258,7 +297,7 @@ class StopWordTests(SimpleTestCase):
 **Interfaces:**
 - Produces: `library.models.BookRecommendation` with `book` (FK `Books`, CASCADE, `related_name="recommendations"`), `recommended` (FK `Books`, CASCADE, `related_name="+"`), `rank` (`PositiveSmallIntegerField`), `score` (`FloatField`), `matched_terms` (`JSONField(default=list)`); `Meta.db_table = "book_recommendations"`, `ordering = ["book_id", "rank"]`; constraints named `book_recommendation_rank_unique` (book, rank), `book_recommendation_pair_unique` (book, recommended), `book_recommendation_not_self` (`~Q(book=F("recommended"))`).
 - Produces: settings `RECOMMENDER_MIN_SCORE = os.environ.get("RECOMMENDER_MIN_SCORE", "0.10")` and `RECOMMENDER_MIN_SCORE_THESIS = os.environ.get("RECOMMENDER_MIN_SCORE_THESIS", "")` (raw strings; parsed in Task 4).
-- Produces, in the test file: `class RecommenderFixtures` with `make_book(call_number, title, author="", tags=None, description="", copies=1, **fields) -> Books` (creates the title and `copies` good copies numbered from 1; fills `publisher="Publisher"`, `year_published="2000"`, `pages="100"`, `isbn=""` unless given) and `make_user(id_number, role=RoleChoices.STUDENT) -> UserLogin` (also creates the `UserProfile`). Later test files import it.
+- Produces, in the test file: `class RecommenderFixtures` with `make_book(call_number, title, author="", tags=None, description="", copies=1, **fields) -> Books` (note: call numbers like `001.A1` carry Dewey class `001`, so fixtures sharing that prefix share a subject token) (creates the title and `copies` good copies numbered from 1; fills `publisher="Publisher"`, `year_published="2000"`, `pages="100"`, `isbn=""` unless given) and `make_user(id_number, role=RoleChoices.STUDENT) -> UserLogin` (also creates the `UserProfile`). Later test files import it.
 
 - [ ] **Step 1: Write the failing tests** (`django.test.TestCase`):
 
@@ -305,11 +344,11 @@ class BookRecommendationModelTests(RecommenderFixtures, TestCase):
   - `TOP_K = 12`, `MAX_TERMS = 3`, `CHUNK_ROWS = 500`, `LOCK_KEY = 74010011`
   - `make_vectorizer() -> TfidfVectorizer` (the only place the vectorizer is configured)
   - `@dataclass class Catalog: books: list[Books]; documents: list[Document]; works: int; vectorizer: TfidfVectorizer | None; matrix: scipy.sparse.csr_matrix | None` (`vectorizer` and `matrix` are `None` when no vocabulary could be learned)
-  - `load_catalog() -> Catalog`: non-archived `Books` ordered by id; fit on one representative per work (longest `description_length`, then newest `year_published` as int with non-numeric as 0, then lowest id); transform every row; catch `ValueError` from fitting.
+  - `load_catalog() -> Catalog`: non-archived `Books` ordered by id, each prepared with `prepare(title, author, tags, description, call_number)`; fit on one representative per work (longest `description_length`, then newest `year_published` as int with non-numeric as 0, then lowest id); transform every row; catch `ValueError` from fitting.
   - `pair_contributions(catalog: Catalog, i: int, j: int) -> list[tuple[str, float]]`: every shared term with `a_t × b_t`, sorted by contribution descending then term ascending.
   - `@dataclass(frozen=True) class BuildStats: items: int; works: int; vocabulary: int; pairs: int; seconds: float`
   - `rebuild_recommendations() -> BuildStats`
-- `rebuild_recommendations` steps, all inside one `transaction.atomic()`: run `SELECT pg_advisory_xact_lock(%s)` with `LOCK_KEY`, then call `load_catalog()` (after the lock); for row chunks of `CHUNK_ROWS` compute `(matrix[chunk] @ matrix.T).toarray()`; per title drop itself, titles with the same `work_key` and scores `<= 0`; order by score descending then candidate id ascending; keep `TOP_K`; `matched_terms` = first `MAX_TERMS` of `pair_contributions` as `{"term", "label", "weight"}` where `label` is the author display name from either document's `labels`, else the term; delete all `BookRecommendation` rows and `bulk_create` the new ones; log the stats at INFO with `logging.getLogger("library.recommender")`.
+- `rebuild_recommendations` steps, all inside one `transaction.atomic()`: run `SELECT pg_advisory_xact_lock(%s)` with `LOCK_KEY`, then call `load_catalog()` (after the lock); for row chunks of `CHUNK_ROWS` compute `(matrix[chunk] @ matrix.T).toarray()`; per title drop itself, titles with the same `work_key` and scores `<= 0`; order by score descending then candidate id ascending; keep `TOP_K`; `matched_terms` = first `MAX_TERMS` of `pair_contributions` as `{"term", "label", "weight"}` where `label` comes from either document's `labels` (author names and Dewey subject names), else the term; delete all `BookRecommendation` rows and `bulk_create` the new ones; log the stats at INFO with `logging.getLogger("library.recommender")`.
 - The command prints one line: `items=<n> works=<n> vocabulary=<n> pairs=<n> seconds=<x.xx>`.
 
 - [ ] **Step 1: Write the failing tests** (append to `test_recommender_build.py`):
@@ -422,6 +461,12 @@ class SmallCatalogTests(RecommenderFixtures, TestCase):
         self.assertEqual(list(BookRecommendation.objects.filter(book=p).values_list("recommended_id", flat=True)),
                          [q1.id, q2.id])                      # equal scores: lower id first
         self.assertTrue(BookRecommendation.objects.filter(book=q1, recommended=q2).exists())
+    def test_shared_dewey_subject_links_titles_with_no_shared_word(self):
+        a = self.make_book("658.1 A1 2020", "Alpha Kinetics", "Ann Lee")
+        b = self.make_book("658.4 B2 2021", "Beta Ledger", "Bo Chan")
+        rebuild_recommendations()
+        row = BookRecommendation.objects.get(book=a, recommended=b)
+        self.assertEqual(row.matched_terms[0]["label"], "Management & public relations")
     def test_non_list_tags_do_not_crash(self):               # Review Focus 1
         book = self.make_book("3", "Gamma Delta", tags=["x"])
         Books.objects.filter(pk=book.pk).update(tags="Programming", description=None)
@@ -559,6 +604,7 @@ Adjust `self.student_user.userprofile` to the real reverse accessor name from `a
 
 **Interfaces:**
 - Consumes: `rebuild_recommendations` (Task 3), imported into `views.py` as `from .recommender.build import rebuild_recommendations`.
+- `addBook/` accepts only multipart form data (cover upload). Post with `format="multipart"` and send `tags` as `json.dumps([...])`, as the frontend does. `editBook/`, `removeBook/`, `addCopy/` and `editCopy/` still take JSON.
 - Produces: `views._refresh_recommendations() -> None`: calls `rebuild_recommendations()`; on any `Exception` logs it with `logger.exception` on `library.recommender` and returns normally.
 - Call sites: `add_books` after a successful create and after un-archiving; `remove_book` after archiving; `edit_book` after `book.save()` only when any of `title`, `author`, `tags`, `description` differs from its value before the edit. No copy endpoint and no loan endpoint calls it.
 
@@ -569,7 +615,7 @@ class RefreshTests(RecommenderFixtures, TestCase):
     NEW = {"call_number": "001.N1", "isbn": "9780000000001", "title": "New Title", "author": "Ana Cruz",
            "publisher": "P", "year_published": "2020", "pages": "10", "item_type": "book"}
     # setUp: self.client = admin APIClient; self.book = self.make_book("001.A1", "Compilers", "Alfred V. Aho", ["Compilers"], "parsing")
-    def test_add_rebuilds(self, rebuild):            # POST /addBook/ self.NEW -> 201, rebuild called once
+    def test_add_rebuilds(self, rebuild):            # POST /addBook/ self.NEW (format="multipart") -> 201, rebuild called once
     def test_unarchive_through_add_rebuilds(self, rebuild):   # archived title with same call_number+isbn -> 200, called once
     def test_invalid_add_does_not_rebuild(self, rebuild):     # POST /addBook/ {} -> 400, not called
     def test_remove_rebuilds(self, rebuild):         # POST /removeBook/ {"book_id": id} -> 200, called once
@@ -774,40 +820,71 @@ class CoverageAndExplainTests(RecommenderFixtures, TestCase):
 
 ---
 
-### Task 8: The "Books to recommend" row
+### Task 8: Open Library autofill: work description and tag cap
 
 **Files:**
-- Modify: `frontend/src/api/books.js`, `frontend/src/components/library/showbook/ShowBook.jsx`, `frontend/src/pages/library/Library.jsx`
-- Create: `frontend/src/components/library/showbook/useRecommendations.js`, `RecommendedRow.jsx`, `RecommendedCard.jsx`, `frontend/src/styles/library/showBook/recommended.module.css`, `docs/recommender-designer-handoff.md`
+- Modify: `backend/books/views.py` (`autofillBookInfo`)
+- Test: `backend/books/tests.py`
 
 **Interfaces:**
-- Consumes: `GET /getRecommendations/?book_id=` (Task 4). Through `returnData`, the result is `{ status, data }` where `data` is the item list.
-- Produces:
-  - `getRecommendations(bookId)` in `books.js`, same shape as `getBooks` (uses `authFetch`, returns `{"status": 500, ...}` on a thrown error).
-  - `useRecommendations(bookId) -> { items, loading, error }`: fetches when `bookId` changes; `items` is `resp.data` when `resp.status === 200`, otherwise `error` is `true` and the hook calls `console.error` once; a response for an older `bookId` is ignored.
-  - `<RecommendedRow bookId onSelectBook isAdmin />` and `<RecommendedCard item onSelect isAdmin />`.
-  - `ShowBook` gains an `onSelectBook` prop.
+- Consumes: `MAX_TAGS` from `library.recommender.preprocess` (Task 1).
+- Produces: the same response shape as today, except `description` comes from the Open Library **work** record (`/works/<id>.json`, found through the edition record's `works[0]["key"]`) when it has one, else from the edition record, else `""` (never the text `"None"`); `tags` holds at most `MAX_TAGS` subject names in Open Library's order (today it is an unordered `set`, so the order changes between calls).
 
-Behavior:
-- Heading text: `Books to recommend`.
-- Loading: 4 placeholder tiles. Results: one card per item. Empty: the heading and `No similar items yet.` Error: render nothing.
-- Card, top to bottom: cover image, or when `item.book.cover_url` is empty a tile showing the title; title clamped to 2 lines; `Book` or `Thesis` from `item.book.item_type`; badge `Available` or `All copies out` from `item.availability`; when `item.reason.length > 0`, `Shares: ` followed by the reasons joined with `, `; when `isAdmin` and `typeof item.score === "number"`, `Score ` followed by `item.score.toFixed(2)`.
-- A card is a `<button type="button">`; click calls `onSelectBook(item.book)`.
-- In `ShowBook.jsx`, render `{!isEdit && <RecommendedRow bookId={currBook.id} onSelectBook={onSelectBook} isAdmin={isAdmin} />}` between the `styles.copies` block and the `styles.buttonContainer` block.
-- In `Library.jsx`, pass `onSelectBook={setActiveBook}` to `<ShowBook>`.
-- `recommended.module.css`: a 4-column grid that drops to 2 columns under 600px. Use only color values, font families and spacing values that already appear in `showbook.module.css` or `bookinfos.module.css`; add no new colors or fonts. Edit no existing CSS file.
+- [ ] **Step 1: Write the failing tests.** Patch `books.views.requests.get` with a fake that answers by URL: `api/books?bibkeys=ISBN:<isbn>` → `{"ISBN:<isbn>": {"key": "/books/OL1M", "title": "T", "subjects": [{"name": f"S{n}"} for n in range(20)], ...}}`; `/books/OL1M.json` → `{"works": [{"key": "/works/OL9W"}]}` (with or without a `description`); `/works/OL9W.json` → `{"description": {"value": "From the work"}}` or `{}`.
 
-`docs/recommender-designer-handoff.md` contains: where the row sits; the card fields in order; the four states with their exact copy; that theses usually have no cover and need the title tile; Figma frames `2165:2489` (row placement) and `2442:1490` (view-book variants); the two files to restyle (`RecommendedRow.jsx`/`RecommendedCard.jsx` markup and `recommended.module.css`); and that `useRecommendations.js` holds the logic and needs no change.
+```python
+class AutofillTests(TestCase):
+    # setUp: authenticated APIClient
+    def test_description_comes_from_the_work_record(self):      # work has one -> "From the work"
+    def test_falls_back_to_the_edition_description(self):       # work has none, edition "From the edition" -> that
+    def test_no_description_is_an_empty_string(self):           # neither has one -> "" (not "None")
+    def test_tags_are_capped_and_keep_open_library_order(self): # tags == ["S0", ..., "S14"]
+    def test_unknown_isbn_is_404(self):                         # bibkeys answer {} -> 404 "No book found"
+```
 
-- [ ] **Step 1: Install dependencies** if the worktree has no `frontend/node_modules`: `npm ci` in `frontend/`.
-- [ ] **Step 2: Implement** the API helper, hook, two components, CSS module, the two prop changes and the handoff note.
-- [ ] **Step 3: Verify.** In `frontend/`: `npm run lint` (expected: no errors in the new or touched files; run it once before Step 2 and note any errors that already exist) and `npm run build` (expected: `built in`).
-- [ ] **Step 4: Check no existing stylesheet changed.** `git diff --stat -- '*.css'` lists only `recommended.module.css`.
-- [ ] **Step 5: Commit** with message `Add plain Books to recommend row to the view-book modal`. Keep this as its own commit: it is the part the designer signs off.
+Each stub line is a full test: call `GET /autofill/?isbn=9780000000001` and assert the status code and the field named in the comment.
+
+- [ ] **Step 2: Run** `TEST books`. Expected: the new tests fail.
+- [ ] **Step 3: Implement** the change in `autofillBookInfo`. Keep the existing 5-second timeouts and error responses; a failing work-record request falls back to the edition description instead of returning 502.
+- [ ] **Step 4: Run** `TEST books library`. Expected: all pass.
+- [ ] **Step 5: Commit** with message `Read autofill descriptions from the Open Library work record`.
 
 ---
 
-### Task 9: Operations notes and full verification
+### Task 9: Recommendations in the designer's slot
+
+**Files:**
+- Modify: `frontend/src/api/books.js`, `frontend/src/components/library/showbook/ShowBook.jsx`, `frontend/src/pages/library/Library.jsx`
+- Create: `frontend/src/components/library/showbook/useRecommendations.js`, `frontend/src/components/library/showbook/RecommendedBooks.jsx`, `docs/recommender-designer-handoff.md`
+
+**Interfaces:**
+- Consumes: `GET /getRecommendations/?book_id=` (Task 4). Through `returnData`, the result is `{ status, data }` where `data` is the item list; each item has `book`, `availability`, `reason` and, for admins, `score`.
+- Consumes: the existing `BookPanel` (`frontend/src/components/library/BookPanel.jsx`, props `setActiveBook`, `setShowBook`, `book`, `status`, `hover`) and the designer's slot in `ShowBook.jsx` on main: `<div className={styles.recommendationContainer}>` › `<div className={styles.recommendations}>`, rendered only when `role !== "admin"`, currently holding a commented-out `BookPanel` map and a `comingSoonContainer` placeholder.
+- Produces:
+  - `getRecommendations(bookId)` in `books.js`, same shape as `getBooks` (uses `authFetch`, returns `{"status": 500, ...}` on a thrown error).
+  - `useRecommendations(bookId) -> { items, loading, error }`: fetches when `bookId` changes; `items` is `resp.data` when `resp.status === 200`, otherwise `error` is `true` and the hook calls `console.error` once; a response for an older `bookId` is ignored.
+  - `<RecommendedBooks bookId setActiveBook setShowBook />`: renders the contents of the `.recommendations` div.
+  - `ShowBook` gains a `setActiveBook` prop; `Library.jsx` passes its `setActiveBook`.
+
+Behavior:
+- Results: one `<BookPanel key={item.book.id} book={item.book} setActiveBook={setActiveBook} setShowBook={setShowBook} />` per item (at most 4, in API order). Clicking a card opens that item in the same modal and loads its recommendations.
+- Empty (`items` is `[]`): the designer's `comingSoonContainer` markup and `libby` image with the text `No similar items yet.`
+- Loading and error: render nothing inside `.recommendations` (the slot keeps its size).
+- Keep the `role !== "admin"` condition and the commented header line exactly as they are. Remove only the commented `BookPanel` map and the `{/* TEMP*/}` placeholder that the new component replaces.
+- `availability`, `reason` and `score` are not shown in this task: `BookPanel` has no place for them yet. The handoff note lists them for the designer.
+- No CSS file is created or edited. The slot's `/*TEMP*/` styles (50% opacity, centered content) stay for the designer to finish.
+
+`docs/recommender-designer-handoff.md` contains: where the slot is; that it now shows up to 4 `BookPanel` cards or the empty message `No similar items yet.`; the fields the API already returns for each card and that are not shown yet (Book/Thesis from `book.item_type`, `availability` = `available` or `all_out` with the labels `Available` / `All copies out`, `reason` as `Shares: …`, and `score` for admins); that theses usually have no cover and `BookPanel` shows an empty image for them; that the `/*TEMP*/` styles on `.recommendationContainer` and `.recommendations` are still in place; whether admins should see the row (with scores) is the designer's decision; and that `useRecommendations.js` holds the logic and needs no change.
+
+- [ ] **Step 1: Install dependencies** if the worktree has no `frontend/node_modules`: `npm ci` in `frontend/`. Run `npm run lint` and note any errors that already exist.
+- [ ] **Step 2: Implement** the API helper, the hook, `RecommendedBooks.jsx`, the `ShowBook` and `Library` prop changes and the handoff note.
+- [ ] **Step 3: Verify.** In `frontend/`: `npm run lint` (expected: no errors in the new or touched files beyond those noted in Step 1) and `npm run build` (expected: `built in`).
+- [ ] **Step 4: Check no stylesheet changed.** `git diff --stat -- '*.css'` prints nothing.
+- [ ] **Step 5: Commit** with message `Show recommended books in the view-book modal`. Keep this as its own commit: it is the part the designer signs off.
+
+---
+
+### Task 10: Operations notes and full verification
 
 **Files:**
 - Create: `backend/RECOMMENDER.md`
@@ -815,11 +892,11 @@ Behavior:
 **Interfaces:**
 - Consumes: everything above.
 
-`backend/RECOMMENDER.md` (same style as `ADMIN_ANALYTICS.md`) covers: what the feature does in three sentences; the endpoint with a sample response for a student and for an admin; the two environment variables and their fallback; when rebuilds happen; the four commands with one example each; deploy steps (`pip install -r requirements.txt`, `migrate`, `rebuild_recommendations`, set `RECOMMENDER_MIN_SCORE` on the host); the privacy rule for judging files; the upgrade path when a rebuild takes more than about 5 seconds; and the black-box cases RC-01 to RC-11 from spec section 12.
+`backend/RECOMMENDER.md` (same style as `ADMIN_ANALYTICS.md`) covers: what the feature does in three sentences; the endpoint with a sample response for a student and for an admin; the two environment variables and their fallback; when rebuilds happen; the four commands with one example each; deploy steps (`pip install -r requirements.txt`, `migrate`, `rebuild_recommendations`, set `RECOMMENDER_MIN_SCORE` on the host); that `DEWEY_DIVISIONS` must be checked against OCLC's DDC 23 summaries before the defense; the privacy rule for judging files; the upgrade path when a rebuild takes more than about 5 seconds; and the black-box cases RC-01 to RC-11 from spec section 12.
 
 - [ ] **Step 1: Write** `backend/RECOMMENDER.md`.
-- [ ] **Step 2: Run the whole backend suite.** `TEST library accounts`. Expected: the Task 0 baseline count plus the new tests, 0 failures.
+- [ ] **Step 2: Run the whole backend suite.** `TEST library accounts books`. Expected: the Task 0 baseline count plus the new tests, 0 failures.
 - [ ] **Step 3: Time a build on realistic data.** In a `manage.py shell --settings=recommender_pg` session against the throwaway database (after `migrate --settings=recommender_pg`), create 300 titles with varied text and run `rebuild_recommendations()`. Record `BuildStats.seconds` in `RECOMMENDER.md`. Never run this against the live database.
-- [ ] **Step 4: Black-box walk-through.** Start the backend with `runserver --settings=recommender_pg` and the frontend with `npm run dev` pointed at it (`VITE_API_URL`), create one admin and one student, add a handful of related titles through the app, and walk RC-01 to RC-11. Record pass or fail per case in `RECOMMENDER.md`. If a browser is not available to the worker, say so in the report and leave the table marked "not run"; do not mark cases as passed without running them.
+- [ ] **Step 4: Black-box walk-through.** Start the backend with `runserver --settings=recommender_pg` and the frontend with `npm run dev` pointed at it (`VITE_API_URL`), create one admin and one student, add a handful of related titles through the app, and walk RC-01 to RC-11 as a student (the slot is student-only; RC-07 checks the admin score through the API response instead of the screen). Record pass or fail per case in `RECOMMENDER.md`. If a browser is not available to the worker, say so in the report and leave the table marked "not run"; do not mark cases as passed without running them.
 - [ ] **Step 5: Commit** with message `Document recommender operations and test cases`.
-- [ ] **Step 6: Report.** Summarize: test counts, the measured build time, which RC cases were run, the two commits a reviewer should look at first (Task 3 and Task 4), and what is still open: designer sign-off for the Task 8 commit, PR #15 must merge first, the first τ needs the team's judging round, and the live database needs `migrate` plus `rebuild_recommendations` at deploy time. Do not push or open a PR unless the user asks.
+- [ ] **Step 6: Report.** Summarize: test counts, the measured build time, which RC cases were run, the two commits a reviewer should look at first (Task 3 and Task 4), and what is still open: designer sign-off for the Task 9 commit, the team's check of `DEWEY_DIVISIONS` and the stop-word lists, the first τ from the team's judging round, and the live database needs `migrate` plus `rebuild_recommendations` at deploy time. Do not push or open a PR unless the user asks.

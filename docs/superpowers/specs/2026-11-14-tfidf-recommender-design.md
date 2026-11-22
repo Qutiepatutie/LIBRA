@@ -1,7 +1,7 @@
 # LIBRA "Books to recommend": TF-IDF + Cosine Similarity Recommender — Design
 
 - **Date:** 2026-11-14
-- **Status:** Approved 2026-11-16; next step is the implementation plan
+- **Status:** Approved 2026-11-16; amended 2026-11-17 (section 15) and 2026-11-22 (section 16, approved by the user)
 - **Branch:** `feat/tfidf-recommender`
 - **Source:** brainstorm record `LIBRA-TFIDF-Recommender-Brainstorm.pdf` (2026-11-10) plus the follow-up design session (2026-11-11 to 2026-11-14)
 
@@ -422,3 +422,57 @@ The BookCopy split was built after this spec was approved (PR #15, branch `feat/
 | `seed_data.py` | calls the rebuild at the end | the script is git-ignored and local, so it is not changed; run `python manage.py rebuild_recommendations` after seeding |
 | τ suggestion | lowest band with ≥ 70% judged good | same, but a band needs at least 5 judged pairs to be eligible, so one lucky pair cannot set τ |
 | Judging sample | 30 non-archived items | 30 non-archived items that have at least one saved candidate (an item with none has nothing to judge) |
+
+## 16. Amendments (2026-11-22): real book data, subject sources, and main after PR #15
+
+Where this section differs from sections 1–15, this section wins.
+
+### 16.1 What the school's book export showed
+
+`docs/Data import libra/[FOR BS CS] BOOKS FROM VI-A & VI-B.xlsx` (git-ignored; never commit it):
+
+| Sheet | Books | Meaning |
+|---|---|---|
+| VI-A | 190 | books at branch VI-A |
+| VI-B (w barcode VI-A) | 155 | books transferred from VI-A to VI-B in 2025–2026; they keep `LRC-VI-A-…` barcodes |
+| VI-B (w barcode VI-B) | 40 | books acquired for VI-B |
+
+- Columns: BOOK LOCATION, BARCODE NO., TITLE, AUTHOR, PLACE OF PUB., PUBLISHER, COPYRIGHT, CALL NO., ISBN, Date Acquired, Date Accessioned (plus REMARKS on the transfer sheet). **No description, subject or tag column.** Like the theses, books arrive with title and author as their only text.
+- 374 of 385 call numbers contain a Dewey class number; the other 11 are FIC, BIO, B, FB and RIZ shelves. The thesis call numbers also contain Dewey numbers (`MT 362.11`, `D 658`, `TH 615`).
+- 72 titles carry edition text (`Principles of economics, 11th ed.`); in a first test, "ed", "2nd" and "3rd" became shared words that linked unrelated books.
+- Authors: 301 rows `Last, First`; 62 use `&` or ` and ` between authors; some are `First Last et al.`.
+- Open Library, looked up the way the app's autofill does: 43% of the 385 ISBNs found, 38% with subjects, 10% with a description. Filipiniana and local publishers: 8% found. Foreign publishers: 76% found.
+- Throwaway test on 385 books + 273 theses: with title and author only, 22 books had no usable words and "Applied psychometry" scored 1.00 against a pharmacy book (the only word left in both was "applied"). Adding the Dewey subject token and the generic textbook words (16.2) left 6 books without usable words and moved that book's matches to psychology books.
+
+Import problems (for the import work, not this feature): every ISBN has hyphens and 362 exceed the 13-character `isbn` field; 3 ISBNs are malformed; two rows share call number `F 336.207 V23 2016` with ISBNs differing by one digit; COPYRIGHT is stored as `2019.0`; Date Acquired mixes formats, typos and Excel serials; one REMARKS cell names a borrower and must not be shared. Branch (VI-A / VI-B) and shelf section (Circulation, Reference, Reserve, Filipiniana…) are not modelled on `BookCopy` yet; that is a separate design (reference and reserve copies may not be borrowable, which would change `available_copies`).
+
+### 16.2 Subject words: Dewey on every item, Open Library subjects as extra tags
+
+Every item's document text becomes:
+
+`title (edition text removed) + author tokens + cleaned tags + Dewey subject token + description`
+
+1. **Dewey subject token, for every book and thesis.** Derived from `call_number` at build time, never stored and never typed in, so it follows call-number edits.
+   - Take the first three-digit class number in the call number (`\b(\d{3})(?:\.\d+)?\b`), ignoring shelf prefixes (`F`, `R`, `FR`, `MT`, `D`, `TH`, …).
+   - Granularity: the Dewey **division** (tens): `658.4` → `650`. Token `ddc_650`.
+   - Display label for reason lines: the division name from a 100-row table `DEWEY_DIVISIONS` (e.g. `650` → `Management & public relations`). The team checks the table against OCLC's published DDC 23 summaries before the defense.
+   - Call numbers without a class number but with a special-collection prefix get a collection token instead: `FIC` → `ddc_fic` "Fiction"; `RIZ` → `ddc_riz` "Rizaliana"; `BIO`, `B`, `FB` → `ddc_bio` "Biography". Anything else gets no subject token.
+   - Division versus three-digit section is a Chapter 4 experiment for the judging round; the build uses division.
+2. **Open Library subjects stay in `tags`.** The add-book autofill already saves Open Library subjects as tags; the school-data import does the same through Open Library's batch lookup. Books Open Library does not know keep the Dewey token, so every item still has one shared subject vocabulary. Tags are capped at the first **15** after cleaning (one test book returned 176 subjects).
+3. **Autofill fix (`backend/books/views.py`):** read the description from the Open Library **work** record (the edition record's `works[0].key`), falling back to the edition record; return an empty string instead of the text `"None"` when there is none. In the sample, the work record had a description for 38 books versus 27 on the edition record.
+4. **Generic textbook title words** join the stop words as `BOOK_TITLE_WORDS`, with title counts from the sample: guide 22, introduction 17, principles 11, basic 11, applications 11, approach 11, fundamentals 10, concepts 8, practice 8, essentials 6, plus applied, volume and part. The team confirms the list.
+5. **Edition text is removed from the title** before it enters the document (same pattern as the work key in 4.5), not only from the work key.
+6. **Authors:** `et al.` is removed from an author part, and the remaining name gives a token only when it has at least two words of two or more letters. `Quilantang, et al.` gives no token; `Masaaki Mitani et al.` gives `masaaki_mitani`.
+
+The Dewey token is one more term in the document, so TF-IDF weights it like any other: common subjects get low IDF, rare ones high. Short titles lean on it, which yields same-subject recommendations rather than none; weak subject-only links are kept out by τ.
+
+### 16.3 main after PR #15
+
+| Topic | Earlier text | Now |
+|---|---|---|
+| Base branch | `feat/book-copy` | `origin/main` (PR #15 merged as `f9c901e`) |
+| UI slot | a new row under the book details | the designer's `recommendationContainer` in `ShowBook.jsx` on main, which already imports `BookPanel` and shows "Book recommendations will be coming soon!". Replace that placeholder with up to 4 `BookPanel` cards. Edit no existing CSS file. |
+| Who sees the row | everyone; admins also see the score | the designer's slot renders for non-admins only. Keep that. The API still returns `score` to admins (for the defense and debugging); whether admins get the row is the designer's decision. |
+| Card content | cover or title tile, type label, availability badge, reason line, admin score | phase 1 uses `BookPanel` as it is (cover, title, author). The type label, availability badge and reason line are in the API response and are added to the card when the designer designs them. A missing cover is the designer's call too. |
+| Card click | `onSelectBook(item.book)` | `BookPanel` calls `setActiveBook(book)` and `setShowBook(true)`; `Library.jsx` passes `setActiveBook` into `ShowBook`, which hands it to the cards. |
+| `addBook/` requests | JSON | multipart form data only (cover upload); tests must post with `format="multipart"` and send `tags` the way the frontend does |
