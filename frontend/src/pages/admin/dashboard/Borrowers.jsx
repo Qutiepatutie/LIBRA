@@ -10,8 +10,16 @@ import { useAdminAnalytics } from "./useAdminDashboard.js"
 
 export default function Borrowers() {
 
-    const { borrowersData } = useAdminAnalytics();
-
+    const {
+        borrowersData,
+        getBorrowersData,
+        params,
+        setParams,
+        loading,
+        setAppliedParams,
+        appliedParams,
+    } = useAdminAnalytics();
+    
     const {
         statistics,
         borrowing_frequency_by_program: borrowingFrequency,
@@ -49,7 +57,15 @@ export default function Borrowers() {
     
     return (
         <div className={styles.borrowers}>
-            <Header/>
+            <Header
+                params={params}
+                setParams={setParams}
+                setAppliedParams={setAppliedParams}
+                appliedParams={appliedParams}
+                data={getBorrowersData}
+                loading={loading}
+            />
+            
             <div className={styles.container}>
                 <div className={styles.panel}>
                     <p className={styles.label}>Total Registered Students</p>

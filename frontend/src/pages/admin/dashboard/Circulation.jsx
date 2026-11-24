@@ -9,8 +9,15 @@ import Heatmap from "../../../components/ui/dashboard/graphs/Heatmap.jsx"
 import { useAdminAnalytics } from "./useAdminDashboard.js"
 
 export default function Circulation() {
-
-    const { circulationData } = useAdminAnalytics();
+    
+    const {
+        params,
+        setParams,
+        setAppliedParams,
+        appliedParams,
+        circulationData,
+        getCirculationData,
+        loading } = useAdminAnalytics();
     
     const {
         statistics,
@@ -49,7 +56,15 @@ export default function Circulation() {
 
     return (
         <div className={styles.circulation}>
-            <Header />
+            <Header
+                params={params}
+                setParams={setParams}
+                setAppliedParams={setAppliedParams}
+                appliedParams={appliedParams}
+                data={getCirculationData}
+                loading={loading}
+            />
+            
             <div className={styles.container}>
                 <div className={styles.panel}>
                     <p className={styles.label}>Borrows (time range)</p>
@@ -76,10 +91,10 @@ export default function Circulation() {
                 <div className={styles.panel}>
                     <Line
                         header={"Total Checkouts"}
-                        subHeader={"By day of week"}
+                        subHeader={`By ${params.range === "year" ? "Month of year" : "day of week"}`}
                         data={total_checkouts}
                         category={"circulation"}
-                        label={"day"}
+                        label={params.range}
                     />
                 </div>
 

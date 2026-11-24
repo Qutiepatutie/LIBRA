@@ -12,9 +12,39 @@ export async function getUserAnalytics() {
     }
 }
 
-export async function getAdminCirculationAnalytics() {
+function getQuery(params) {
+    return new URLSearchParams({
+        range: params?.range.toLowerCase() ?? "",
+        item_type: params?.item_type.toLowerCase() ?? "",
+        program: params?.program ?? "all",
+        academic_year: params?.academic_year ?? "",
+        semester: params?.semester ?? "",
+        education_level: params?.education_level ?? "",
+    }) 
+}
+
+export async function getAdminCirculationAnalytics(params) {
+    console.log(params);
     try {
-        const resp = await authFetch(`${API_URL}/getCirculationDashboard`);
+        const query = getQuery(params);
+        
+        const resp = await authFetch(
+            `${API_URL}/getCirculationDashboard?${query.toString()}`
+        );
+
+        return await returnData(resp);
+    } catch (err){
+        return ({"status": 500, "message":`Connection to Server Failed: ${err}`});
+    }
+}
+
+export async function getAdminBorrowersAnalytics(params) {
+    try {
+        const query = getQuery(params);
+        
+        const resp = await authFetch(
+            `${API_URL}/getBorrowersDashboard?${query.toString()}`
+        );
 
         return await returnData(resp);
     } catch {
@@ -25,16 +55,6 @@ export async function getAdminCirculationAnalytics() {
 export async function getAdminInventoryAnalytics() {
     try {
         const resp = await authFetch(`${API_URL}/getInventoryDashboard`);
-
-        return await returnData(resp);
-    } catch {
-        return ({"status": 500, "message":"Connection to Server Failed"});
-    }
-}
-
-export async function getAdminBorrowersAnalytics() {
-    try {
-        const resp = await authFetch(`${API_URL}/getBorrowersDashboard`);
 
         return await returnData(resp);
     } catch {

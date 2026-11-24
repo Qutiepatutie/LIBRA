@@ -5,37 +5,51 @@ import { Line } from "react-chartjs-2"
 
 import getNiceScale from "./getNiceScale";
 
-export default function LineGraph({header, subHeader, data, category = "user", label = "month"}) {
+export default function LineGraph({header, subHeader, data, category = "user", label = "day"}) {
 
     Chartjs.register(CategoryScale, LinearScale, LineElement, PointElement, Tooltip, Legend);
 
-    const labels = {
-        month: [
-            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-        ],
-        day: [
+    const day = [
             "Mon", "Tue", "Wed", "Thu", "Fri", "Sat",
-        ]
+    ]
+    
+    const labels = {
+        year: [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+        ],
+        day: day,
+        week: day,
+        semester: day,
     };
 
     const dataset = Array(labels[label]?.length).fill(0);
 
     data?.forEach(item => {
-        const period = category === "user"
-            ? item.month.split("-")[1]
-            : category === "circulation"
-                ? labels[label].indexOf(item.label)+1
-                : labels[label].indexOf(item.day)+1
-
-        const index = Number(period) - 1;
-
-        if (index >= 0 && index < 12) {
-            dataset[index] += item.count;
+        let index;
+        
+        if (category === "user") {
+            const month = Number(item.month.split("-")[1]);
+            index = month - 1;
+        } 
+        else if (category === "circulation") {
+            if (label === "year") {
+                const month = Number(item.label.split("-")[1]);
+                index = month - 1;
+            } else {
+                index = labels[label].indexOf(item.label);
+            }
+        } 
+        else {
+            index = labels[label].indexOf(item.day);
         }
-    })
+        
+        if (index >= 0 && index < dataset.length) {
+            dataset[index] += Number(item.count);
+        }
+    });
 
-    const maxCount = Math.max(...data?.map(item => item.count) ?? [0]);
+    const maxCount = Math.max(...dataset, 0);
 
     const { interval, yAxisMax } = getNiceScale(maxCount);
 
