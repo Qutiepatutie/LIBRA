@@ -96,6 +96,26 @@ export async function getAllBorrowers() {
     }
 }
 
+export async function exportBorrowedBooksCSV() {
+    try {
+        const resp = await authFetch(`${API_URL}/exportBorrowedBooksCSV/`);
+
+        // Errors are JSON; only a 200 carries the CSV, so it must not go through returnData.
+        if (resp.status !== 200) {
+            return await returnData(resp);
+        }
+
+        // Content-Disposition is only readable cross-origin if the server exposes it.
+        const disposition = resp.headers.get("Content-Disposition") || "";
+        const match = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+        const filename = match ? decodeURIComponent(match[1].trim()) : "borrowed_books.csv";
+
+        return ({"status": 200, "blob": await resp.blob(), filename});
+    } catch {
+        return ({"status": 500, "message":"Connection to Server Failed"});
+    }
+}
+
 export async function acceptBorrowedBook(loan_id) {
     try {
         const resp = await authFetch(`${API_URL}/acceptBorrowedBook/`, {

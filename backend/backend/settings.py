@@ -87,6 +87,8 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 
 CORS_ALLOW_ALL_ORIGINS = True
+# Lets the frontend read the CSV export's filename from a cross-origin response.
+CORS_EXPOSE_HEADERS = ["Content-Disposition"]
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
