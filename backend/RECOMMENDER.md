@@ -114,11 +114,15 @@ only right after a rebuild.
 
 ## Deploy steps
 
-1. `pip install -r requirements.txt` (adds `scikit-learn==1.9.1`; plan for about 100 MB
+1. `python manage.py showmigrations library` first. The live database may also still need
+   the earlier BookCopy migrations `0013` to `0016`, which `migrate` applies before `0017`.
+2. `pip install -r requirements.txt` (adds `scikit-learn==1.9.1`; plan for about 100 MB
    more memory on the host).
-2. `python manage.py migrate` (creates `book_recommendations`).
-3. `python manage.py rebuild_recommendations` (the table starts empty).
-4. Set `RECOMMENDER_MIN_SCORE` on the host (and `RECOMMENDER_MIN_SCORE_THESIS` if the
+3. `python manage.py migrate` (creates `book_recommendations`).
+4. `python manage.py rebuild_recommendations` (the table starts empty). On a host without
+   a shell, run it from a machine that has the production environment settings, or let the
+   first admin catalog save (add, edit or archive a title) rebuild the table.
+5. Set `RECOMMENDER_MIN_SCORE` on the host (and `RECOMMENDER_MIN_SCORE_THESIS` if the
    team decides on a separate thesis threshold), then restart.
 
 ## Before the defense
@@ -161,7 +165,7 @@ table.
 `library.tests` has 9 pre-existing `addBook` failures on main (8 failures, 1 error in
 `CatalogCopyTests` and `ItemIdentityTests`): the tests post JSON to the multipart-only
 endpoint and get `415`. They are not fixed on this branch. Full suite on this branch
-(`manage.py test library accounts books`): 268 tests, only those 9 fail.
+(`manage.py test library accounts books`): 275 tests, only those 9 fail.
 
 ## Black-box cases (spec section 12)
 
