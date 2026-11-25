@@ -120,7 +120,9 @@ export default function Library() {
                 
                 {showBook && (
                     <ShowBook 
+                        key={liveBook.id}
                         setShowBook={setShowBook}
+                        setActiveBook={setActiveBook}
                         currBook={liveBook}
                         onConfirmEdit={handleUpdateBook}
                         refreshBooks={fetchBooks}
