@@ -12,9 +12,9 @@
 
 ## Global Constraints
 
-- **Base:** `origin/main` (PR #15, the BookCopy split, is merged there as `f9c901e`). Task 0 sets this up.
+- **Base:** `origin/main` at `003f53a` (2026-11-25). It includes PR #15, the BookCopy split (`f9c901e`), the cover upload (`e7aa863`, `addBook/` is multipart only) and the endpoint permissions tightening (`9a7778d`, catalog edits are admin only). Task 0 sets this up.
 - **Execution method (chosen by the user):** subagents do the coding; the main conversation only coordinates and reports.
-- **Never touch the live database.** The main checkout's `backend/.env` points at live Supabase. Run every `manage.py` command with `--settings=recommender_pg` (Task 0). Never run `migrate` or `test` with default settings.
+- **Never touch the live database or live storage.** The main checkout's `backend/.env` points at live Supabase. The worktree has no `backend/.env`; never copy it there. Run every `manage.py` command with `--settings=recommender_pg` (Task 0), which sets dummy Supabase values. Never run `migrate` or `test` with default settings.
 - **Test command prefix**, written `TEST` in this plan, run from `backend/` in the worktree:
   `PYTHONPATH="C:/github25/recommender-test-settings" RECOMMENDER_AGENT=<tag> C:/github25/bookly-lms/backend/venv/Scripts/python.exe manage.py test --settings=recommender_pg --noinput`
   Each parallel worker uses its own `<tag>` (it names the test database).
@@ -69,25 +69,29 @@ Inputs the spec implies but does not spell out. Each has a test in the task name
 **Interfaces:**
 - Produces: worktree `C:/github25/bookly-lms-recommender` on `feat/tfidf-recommender` rebased onto `origin/main`; the `TEST` command.
 
-- [ ] **Step 1: Create the worktree.** The branch is checked out in the main checkout, which has an uncommitted `Heatmap.jsx` change and an untracked `docs/reports/`. Both must survive.
+- [ ] **Step 1: Create the worktree.** (Done by the controller on 2026-11-25.) The main checkout stays on `main` with its uncommitted `.gitignore` and `Heatmap.jsx` changes and the untracked `docs/reports/`; none of them may be touched.
 
 ```bash
 cd C:/github25/bookly-lms
-git switch main            # carries the uncommitted Heatmap.jsx change along; stop and report if git refuses
 git worktree add ../bookly-lms-recommender feat/tfidf-recommender
 cd ../bookly-lms-recommender
 git fetch origin
 git rebase origin/main
 ```
 
-Expected: rebase succeeds with no conflicts (the branch only adds files under `docs/superpowers/`). `git log --oneline -8` shows the docs commits on top of origin/main's latest commit.
+Expected: rebase succeeds with no conflicts (the branch only adds files under `docs/superpowers/`). `git log --oneline -8` shows the docs commits on top of `003f53a`.
 
 - [ ] **Step 2: Create the settings module** with exactly this content:
 
 ```python
 """Throwaway local Postgres for the recommender work. Never points at the live DB."""
 import os
-from backend.test_settings import *  # noqa: F403
+
+# library/supabase_client.py builds a client at import time. Dummy values keep tests away from live storage.
+os.environ.setdefault("SUPABASE_URL", "http://127.0.0.1:9")
+os.environ.setdefault("SUPABASE_SERVICE_KEY", "test-only-dummy-key")
+
+from backend.test_settings import *  # noqa: E402,F403
 
 DATABASES = {'default': {
     'ENGINE': 'django.db.backends.postgresql',
@@ -99,9 +103,9 @@ DATABASES = {'default': {
 
 - [ ] **Step 3: Check Postgres is up.** Run `"C:/Program Files/PostgreSQL/18/bin/pg_isready" -h 127.0.0.1 -p 55432`. Expected: `accepting connections`. If not, start a throwaway cluster: `initdb -U postgres -A trust -D <scratch dir>` then `pg_ctl -D <scratch dir> -o "-p 55432" start` (do not pipe `pg_ctl` output; it hangs the shell).
 
-- [ ] **Step 4: Install scikit-learn into the shared venv.** `C:/github25/bookly-lms/backend/venv/Scripts/python.exe -m pip install scikit-learn==1.9.1`. Expected: `Successfully installed` including numpy and scipy.
+- [ ] **Step 4: Install scikit-learn and supabase into the shared venv.** `C:/github25/bookly-lms/backend/venv/Scripts/python.exe -m pip install scikit-learn==1.9.1 supabase`. Expected: `Successfully installed` including scipy (numpy 2.4.2 is already there). `supabase` is in `dev-requirements.txt` but missing from the venv; `library/supabase_client.py` imports it.
 
-- [ ] **Step 5: Baseline.** Run `TEST library books`. Expected: all tests pass. Record the count; if any fail, stop and report before changing code.
+- [ ] **Step 5: Baseline.** Run `TEST library books`. Expected: all tests pass (the 9 `addBook/` tests that failed with 415 before were fixed on main for multipart). Record the count; if any fail, stop and report before changing code.
 
 ---
 
@@ -608,7 +612,7 @@ Adjust `self.student_user.userprofile` to the real reverse accessor name from `a
 - Produces: `views._refresh_recommendations() -> None`: calls `rebuild_recommendations()`; on any `Exception` logs it with `logger.exception` on `library.recommender` and returns normally.
 - Call sites: `add_books` after a successful create and after un-archiving; `remove_book` after archiving; `edit_book` after `book.save()` only when any of `title`, `author`, `tags`, `description` differs from its value before the edit. No copy endpoint and no loan endpoint calls it.
 
-- [ ] **Step 1: Write the failing tests.** Patch `library.views.rebuild_recommendations` with `unittest.mock.patch`; use an admin `APIClient` (the access-rules branch makes these endpoints admin-only).
+- [ ] **Step 1: Write the failing tests.** Patch `library.views.rebuild_recommendations` with `unittest.mock.patch`; use an admin `APIClient` (these endpoints are admin-only on main since `9a7778d`).
 
 ```python
 class RefreshTests(RecommenderFixtures, TestCase):
