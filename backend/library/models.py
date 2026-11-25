@@ -150,6 +150,46 @@ class BookCopy(models.Model):
     def __str__(self):
         return f'{self.book_id} c.{self.copy_number}'
 
+# Precomputed "books to recommend" for a title; rebuilt explicitly, never by signals.
+class BookRecommendation(models.Model):
+    book = models.ForeignKey(
+        Books,
+        on_delete=models.CASCADE,
+        related_name='recommendations'
+    )
+
+    recommended = models.ForeignKey(
+        Books,
+        on_delete=models.CASCADE,
+        related_name='+'
+    )
+
+    rank = models.PositiveSmallIntegerField()
+
+    score = models.FloatField()
+
+    matched_terms = models.JSONField(
+        default=list
+    )
+
+    class Meta:
+        db_table = 'book_recommendations'
+        ordering = ['book_id', 'rank']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['book', 'rank'],
+                name='book_recommendation_rank_unique',
+            ),
+            models.UniqueConstraint(
+                fields=['book', 'recommended'],
+                name='book_recommendation_pair_unique',
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(book=models.F('recommended')),
+                name='book_recommendation_not_self',
+            ),
+        ]
+
 class BorrowRecords(models.Model):
     user = models.ForeignKey(
         UserProfile,
