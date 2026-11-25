@@ -221,7 +221,7 @@ def edit_book(request):
     if item_type not in ItemType.values:
         return Response({"message":"Invalid item type"}, status=status.HTTP_400_BAD_REQUEST)
 
-    text_before = (book.title, book.author, book.tags, book.description)
+    text_before = (book.title, book.author, book.tags, book.description, book.call_number)
 
     book.description = request.data.get("description", book.description)
     book.title = request.data.get("title", book.title)
@@ -235,7 +235,7 @@ def edit_book(request):
 
     book.save()
 
-    if (book.title, book.author, book.tags, book.description) != text_before:
+    if (book.title, book.author, book.tags, book.description, book.call_number) != text_before:
         _refresh_recommendations()
 
     return Response ({"message":"Book Successfully Edited"}, status=status.HTTP_200_OK)

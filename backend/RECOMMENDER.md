@@ -63,9 +63,10 @@ round.
 
 - `addBook/` succeeds, for a new title and for an un-archived title;
 - `removeBook/` (archive);
-- `editBook/` only when `title`, `author`, `tags` or `description` changed.
+- `editBook/` only when `title`, `author`, `tags`, `description` or `call_number` changed
+  (the Dewey subject word is derived from the call number).
 
-Condition, pages, publisher, call number and similar edits do not rebuild. No copy or
+Condition, pages, publisher and similar edits do not rebuild. No copy or
 loan endpoint rebuilds (availability is read live). A failed rebuild is logged with the
 traceback on the `library.recommender` logger and never fails the save; the previous
 table stays. Data loaded straight into the database (imports, seed script) needs a manual

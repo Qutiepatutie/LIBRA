@@ -610,7 +610,7 @@ Adjust `self.student_user.userprofile` to the real reverse accessor name from `a
 - Consumes: `rebuild_recommendations` (Task 3), imported into `views.py` as `from .recommender.build import rebuild_recommendations`.
 - `addBook/` accepts only multipart form data (cover upload). Post with `format="multipart"` and send `tags` as `json.dumps([...])`, as the frontend does. `editBook/`, `removeBook/`, `addCopy/` and `editCopy/` still take JSON.
 - Produces: `views._refresh_recommendations() -> None`: calls `rebuild_recommendations()`; on any `Exception` logs it with `logger.exception` on `library.recommender` and returns normally.
-- Call sites: `add_books` after a successful create and after un-archiving; `remove_book` after archiving; `edit_book` after `book.save()` only when any of `title`, `author`, `tags`, `description` differs from its value before the edit. No copy endpoint and no loan endpoint calls it.
+- Call sites: `add_books` after a successful create and after un-archiving; `remove_book` after archiving; `edit_book` after `book.save()` only when any of `title`, `author`, `tags`, `description`, `call_number` differs from its value before the edit. No copy endpoint and no loan endpoint calls it.
 
 - [ ] **Step 1: Write the failing tests.** Patch `library.views.rebuild_recommendations` with `unittest.mock.patch`; use an admin `APIClient` (these endpoints are admin-only on main since `9a7778d`).
 
@@ -623,7 +623,7 @@ class RefreshTests(RecommenderFixtures, TestCase):
     def test_unarchive_through_add_rebuilds(self, rebuild):   # archived title with same call_number+isbn -> 200, called once
     def test_invalid_add_does_not_rebuild(self, rebuild):     # POST /addBook/ {} -> 400, not called
     def test_remove_rebuilds(self, rebuild):         # POST /removeBook/ {"book_id": id} -> 200, called once
-    def test_text_edit_rebuilds(self, rebuild):      # one subTest per field: title, author, tags, description
+    def test_text_edit_rebuilds(self, rebuild):      # one subTest per field: title, author, tags, description, call_number
     def test_non_text_edit_does_not_rebuild(self, rebuild):   # PUT /editBook/ {"book_id": id, "pages": "999", "publisher": "X"} -> 200, not called
     def test_resubmitting_same_text_does_not_rebuild(self, rebuild):  # PUT with the current title/author/tags/description -> not called
     def test_copy_changes_do_not_rebuild(self, rebuild):      # POST /addCopy/ {"book_id": id}; PUT /editCopy/ condition=lost -> not called

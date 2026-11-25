@@ -43,7 +43,7 @@ class RefreshTests(RecommenderFixtures, TestCase):
 
     def test_text_edit_rebuilds(self, rebuild):
         changes = {"title": "Compilers II", "author": "Someone Else",
-                   "tags": ["Compilers", "Parsing"], "description": "lexing"}
+                   "tags": ["Compilers", "Parsing"], "description": "lexing", "call_number": "005.1 A1"}
         for field, value in changes.items():
             with self.subTest(field=field):
                 rebuild.reset_mock()
