@@ -42,7 +42,7 @@ class CopySerializer(serializers.ModelSerializer):
         fields = ["id", "copy_number", "accession_number", "condition", "date_acquired", "is_available"]
 
     def get_is_available(self, copy):
-        # Listings annotate is_available (see views.with_availability) so a page of copies costs no extra queries.
+        # Listings annotate is_available (see copies.with_availability) so a page of copies costs no extra queries.
         if hasattr(copy, "is_available"):
             return copy.is_available
         return available_copies().filter(pk=copy.pk).exists()
