@@ -87,11 +87,14 @@ def _description(value):
 
 def write_judging_files(rows, out_dir):
     out_dir = Path(out_dir)
+    sheet_path = out_dir / "judging_sheet.csv"
+    key_path = out_dir / "judging_key.csv"
+    for path in (sheet_path, key_path):
+        if path.exists():
+            raise ValueError(f"{path} already exists; choose a new --out directory.")
     out_dir.mkdir(parents=True, exist_ok=True)
     ids = {r.viewed_id for r in rows} | {r.candidate_id for r in rows}
     books = Books.objects.in_bulk(ids)
-    sheet_path = out_dir / "judging_sheet.csv"
-    key_path = out_dir / "judging_key.csv"
     with open(sheet_path, "w", encoding="utf-8-sig", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(SHEET_COLUMNS)
@@ -114,13 +117,24 @@ def write_judging_files(rows, out_dir):
     return sheet_path, key_path
 
 
+def _require_columns(path, reader, columns):
+    missing = [c for c in columns if c not in (reader.fieldnames or [])]
+    if missing:
+        raise ValueError(f"{path}: missing column(s) {', '.join(missing)}")
+
+
 def read_key(path):
+    rows = []
     with open(path, encoding="utf-8-sig", newline="") as f:
-        return [
-            KeyRow(int(row["pair"]), int(row["viewed_id"]), int(row["candidate_id"]),
-                   row["viewed_type"], float(row["score"]), int(row["rank"]), row["group"])
-            for row in csv.DictReader(f)
-        ]
+        reader = csv.DictReader(f)
+        _require_columns(path, reader, KEY_COLUMNS)
+        for line, row in enumerate(reader, start=2):
+            try:
+                rows.append(KeyRow(int(row["pair"]), int(row["viewed_id"]), int(row["candidate_id"]),
+                                   row["viewed_type"], float(row["score"]), int(row["rank"]), row["group"]))
+            except (TypeError, ValueError) as error:
+                raise ValueError(f"{path}: line {line}: {error}") from error
+    return rows
 
 
 BAND_WIDTH = 0.05
@@ -129,21 +143,39 @@ MIN_BAND_PAIRS = 5
 THESIS = "thesis"
 
 
-def majority_votes(sheet_paths):
+def read_sheet_votes(path):
+    """(pair, good) for every answered row of one filled sheet; blank answers are skipped."""
+    votes = []
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        _require_columns(path, reader, ["pair", "good"])
+        for line, row in enumerate(reader, start=2):
+            answer = (row.get("good") or "").strip().lower()
+            if answer in ("y", "yes"):
+                good = True
+            elif answer in ("n", "no"):
+                good = False
+            else:
+                continue
+            try:
+                pair = int(row["pair"])
+            except (TypeError, ValueError) as error:
+                raise ValueError(f"{path}: line {line}: bad pair number {row['pair']!r}") from error
+            votes.append((pair, good))
+    return votes
+
+
+def majority_of(sheets):
     tally = {}
-    for path in sheet_paths:
-        with open(path, encoding="utf-8-sig", newline="") as f:
-            for row in csv.DictReader(f):
-                answer = (row.get("good") or "").strip().lower()
-                if answer in ("y", "yes"):
-                    vote = 0
-                elif answer in ("n", "no"):
-                    vote = 1
-                else:
-                    continue
-                counts = tally.setdefault(int(row["pair"]), [0, 0])
-                counts[vote] += 1
+    for votes in sheets:
+        for pair, good in votes:
+            counts = tally.setdefault(pair, [0, 0])
+            counts[0 if good else 1] += 1
     return {pair: yes > no for pair, (yes, no) in tally.items()}
+
+
+def majority_votes(sheet_paths):
+    return majority_of(read_sheet_votes(path) for path in sheet_paths)
 
 
 @dataclass(frozen=True)

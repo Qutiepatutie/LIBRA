@@ -88,16 +88,20 @@ python manage.py export_judging_sheet --items 30 --per-item 8 --seed 42 --out D:
 Samples 30 titles that have saved candidates, takes each title's ranks 1..8 (ignoring
 tau), splits titles into group A (choose tau) and B (measure). The sheet has no score,
 rank or group; the key has them. `--out` must be outside the repository or the command
-refuses.
+refuses. It also refuses when `judging_sheet.csv` or `judging_key.csv` already exists in
+`--out`, so a filled sheet is never overwritten; use a new directory for each round.
 
 ```
 python manage.py evaluate_recommender --key D:\judging\round1\judging_key.csv ^
   --sheet D:\judging\round1\judge1.csv --sheet D:\judging\round1\judge2.csv ^
   --out D:\judging\round1\results [--tau 0.15] [--tau-thesis 0.20]
 ```
-Majority vote per pair (tie = not good, blank = no vote). Prints 0.05-wide score bands
-for all, books and theses, and the suggested tau (lowest band with at least 70 percent
-good and at least 5 judged pairs). Without `--tau` the "all" suggestion is used for
+Prints the number of votes read from each sheet, then takes the majority vote per pair
+(tie = not good, blank = no vote). A sheet that is not UTF-8, is missing, lacks a `pair`
+or `good` column or has a bad pair number stops the command with the file named (the
+key is checked the same way). Prints 0.05-wide score bands for all, books and theses,
+and the suggested tau (lowest band with at least 70 percent good and at least 5 judged
+pairs). Without `--tau` the "all" suggestion is used for
 precision@4 (group B) and coverage. Writes `bands.csv` and `top4_scores.csv` to `--out`.
 
 ```

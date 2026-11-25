@@ -84,6 +84,24 @@ class JudgingSheetTests(RecommenderFixtures, TestCase):
                      stdout=io.StringIO())
         self.assertEqual(sorted(os.listdir(self.out)), ["judging_key.csv", "judging_sheet.csv"])
 
+    def test_existing_judging_files_are_not_overwritten(self):
+        rows = sample_pairs(6, 2, seed=42)
+        for name in ("judging_sheet.csv", "judging_key.csv"):
+            with self.subTest(existing=name):
+                tmp = tempfile.TemporaryDirectory()
+                self.addCleanup(tmp.cleanup)
+                existing = os.path.join(tmp.name, name)
+                with open(existing, "w", encoding="utf-8") as f:
+                    f.write("filled in\n")
+                with self.assertRaisesRegex(ValueError, name):
+                    write_judging_files(rows, tmp.name)
+                with self.assertRaisesRegex(CommandError, name):
+                    call_command("export_judging_sheet", items=6, per_item=2, seed=42, out=tmp.name,
+                                 stdout=io.StringIO())
+                with open(existing, encoding="utf-8") as f:
+                    self.assertEqual(f.read(), "filled in\n")
+                self.assertEqual(os.listdir(tmp.name), [name])
+
     def test_relative_and_dotdot_paths_inside_repository_are_refused(self):
         with self.assertRaises(ValueError):
             ensure_outside_repo(os.path.relpath(settings.BASE_DIR / "x"))
@@ -255,5 +273,51 @@ class CoverageAndExplainTests(RecommenderFixtures, TestCase):
         call_command("evaluate_recommender", key=os.path.join(src.name, "judging_key.csv"), sheet=[sheet],
                      out=res.name, tau=0.0, stdout=out)
         self.assertIn("precision@4", out.getvalue())
+        self.assertIn(f"{sheet}: {len(rows)} votes read", out.getvalue())
         self.assertIn("coverage", out.getvalue())
         self.assertEqual(sorted(os.listdir(res.name)), ["bands.csv", "top4_scores.csv"])
+
+
+class EvaluateInputTests(SimpleTestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = tmp.name
+        self.key = self.write("judging_key.csv",
+                              "pair,viewed_id,candidate_id,viewed_type,score,rank,group\n1,10,20,book,0.3,1,A\n")
+
+    def write(self, name, text, encoding="utf-8"):
+        path = os.path.join(self.dir, name)
+        with open(path, "w", encoding=encoding, newline="") as f:
+            f.write(text)
+        return path
+
+    def evaluate(self, sheet, key=None):
+        call_command("evaluate_recommender", key=key or self.key, sheet=[sheet],
+                     out=os.path.join(self.dir, "results"), stdout=io.StringIO())
+
+    def test_sheet_without_good_column_is_refused(self):
+        sheet = self.write("judge1.csv", "pair,answer\n1,Y\n")
+        with self.assertRaisesRegex(ValueError, r"judge1\.csv.*good"):
+            majority_votes([sheet])
+        with self.assertRaisesRegex(CommandError, r"judge1\.csv.*good"):
+            self.evaluate(sheet)
+
+    def test_sheet_saved_as_cp1252_is_refused(self):
+        sheet = self.write("judge1.csv", "pair,viewed_author,good\n1,Peña,Y\n", encoding="cp1252")
+        with self.assertRaisesRegex(CommandError, r"judge1\.csv.*CSV UTF-8"):
+            self.evaluate(sheet)
+
+    def test_missing_sheet_is_refused(self):
+        with self.assertRaisesRegex(CommandError, r"judge9\.csv"):
+            self.evaluate(os.path.join(self.dir, "judge9.csv"))
+
+    def test_bad_pair_number_is_refused(self):
+        sheet = self.write("judge1.csv", "pair,good\nseven,Y\n")
+        with self.assertRaisesRegex(CommandError, r"judge1\.csv.*seven"):
+            self.evaluate(sheet)
+
+    def test_key_without_score_column_is_refused(self):
+        key = self.write("other_key.csv", "pair,viewed_id\n1,10\n")
+        with self.assertRaisesRegex(CommandError, r"other_key\.csv.*score"):
+            self.evaluate(self.write("judge1.csv", "pair,good\n1,Y\n"), key=key)

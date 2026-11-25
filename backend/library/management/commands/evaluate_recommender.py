@@ -3,9 +3,22 @@ import csv
 from django.core.management.base import BaseCommand, CommandError
 
 from library.recommender.evaluation import (
-    THESIS, band_table, coverage, ensure_outside_repo, majority_votes, precision_at_4, read_key,
-    suggest_tau, top4_scores,
+    THESIS, band_table, coverage, ensure_outside_repo, majority_of, precision_at_4, read_key,
+    read_sheet_votes, suggest_tau, top4_scores,
 )
+
+
+def _read(path, reader):
+    try:
+        return reader(path)
+    except UnicodeDecodeError:
+        raise CommandError(f"{path}: not UTF-8 — save the sheet as 'CSV UTF-8'")
+    except OSError as error:
+        raise CommandError(f"{path}: {error.strerror or error}")
+    except KeyError as error:
+        raise CommandError(f"{path}: missing column {error}")
+    except ValueError as error:
+        raise CommandError(str(error) if str(path) in str(error) else f"{path}: {error}")
 
 
 class Command(BaseCommand):
@@ -31,8 +44,12 @@ class Command(BaseCommand):
             out_dir = ensure_outside_repo(options["out"])
         except ValueError as error:
             raise CommandError(str(error))
-        rows = read_key(options["key"])
-        votes = majority_votes(options["sheet"])
+        rows = _read(options["key"], read_key)
+        sheets = []
+        for path in options["sheet"]:
+            sheets.append(_read(path, read_sheet_votes))
+            self.stdout.write(f"{path}: {len(sheets[-1])} votes read")
+        votes = majority_of(sheets)
         all_bands = band_table(rows, votes)
         suggestion = self._print_bands("all", all_bands)
         self._print_bands("books", band_table(rows, votes, "book"))

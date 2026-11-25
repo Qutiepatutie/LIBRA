@@ -18,7 +18,10 @@ class Command(BaseCommand):
         except ValueError as error:
             raise CommandError(str(error))
         rows = sample_pairs(options["items"], options["per_item"], options["seed"])
-        sheet, key = write_judging_files(rows, out_dir)
+        try:
+            sheet, key = write_judging_files(rows, out_dir)
+        except ValueError as error:
+            raise CommandError(str(error))
         per_group = {"A": set(), "B": set()}
         for r in rows:
             per_group[r.group].add(r.viewed_id)
