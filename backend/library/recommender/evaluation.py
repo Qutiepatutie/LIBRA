@@ -39,8 +39,13 @@ def _quotas(counts, items):
     total = sum(counts.values())
     target = min(items, total)
     quotas = {t: min(counts[t], round(items * counts[t] / total)) for t in counts}
-    largest = max(sorted(counts), key=lambda t: counts[t])
-    quotas[largest] = max(0, min(counts[largest], quotas[largest] + target - sum(quotas.values())))
+    remainder = target - sum(quotas.values())
+    for item_type in sorted(counts, key=lambda t: (-counts[t], t)):
+        if remainder == 0:
+            break
+        change = max(-quotas[item_type], min(counts[item_type] - quotas[item_type], remainder))
+        quotas[item_type] += change
+        remainder -= change
     return quotas
 
 

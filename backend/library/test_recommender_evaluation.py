@@ -2,6 +2,7 @@ import collections
 import csv
 import io
 import os
+import pathlib
 import tempfile
 
 from django.conf import settings
@@ -11,7 +12,7 @@ from django.test import TestCase
 
 from library.models import BookRecommendation
 from library.recommender.evaluation import (
-    SHEET_COLUMNS, ensure_outside_repo, read_key, sample_pairs, write_judging_files,
+    SHEET_COLUMNS, _quotas, ensure_outside_repo, read_key, sample_pairs, write_judging_files,
 )
 from library.test_recommender_build import RecommenderFixtures
 
@@ -80,3 +81,33 @@ class JudgingSheetTests(RecommenderFixtures, TestCase):
         call_command("export_judging_sheet", items=6, per_item=2, seed=42, out=self.out,
                      stdout=io.StringIO())
         self.assertEqual(sorted(os.listdir(self.out)), ["judging_key.csv", "judging_sheet.csv"])
+
+    def test_relative_and_dotdot_paths_inside_repository_are_refused(self):
+        with self.assertRaises(ValueError):
+            ensure_outside_repo(os.path.relpath(settings.BASE_DIR / "x"))
+        with self.assertRaises(ValueError):
+            ensure_outside_repo(settings.BASE_DIR / "a" / ".." / "judging")
+
+    def test_temp_directory_is_accepted(self):
+        self.assertEqual(ensure_outside_repo(self.out), pathlib.Path(self.out).resolve())
+
+    def test_quotas_always_total_the_target(self):
+        many_small = {f"t{i}": 1 for i in range(10)}
+        self.assertEqual(sum(_quotas(many_small, 7).values()), 7)
+        self.assertEqual(_quotas({"book": 10}, 4), {"book": 4})
+        self.assertEqual(_quotas({"book": 8, "thesis": 2}, 50), {"book": 8, "thesis": 2})
+        for items in range(0, 15):
+            quotas = _quotas({"a": 5, "b": 3, "c": 1, "d": 1}, items)
+            self.assertEqual(sum(quotas.values()), min(items, 10))
+            self.assertTrue(all(0 <= quotas[t] <= c for t, c in {"a": 5, "b": 3, "c": 1, "d": 1}.items()))
+
+    def test_description_is_cut_and_placeholder_is_blank(self):
+        first = sample_pairs(1, 1, seed=1)[0]
+        from library.models import Books
+        Books.objects.filter(id=first.viewed_id).update(description="x" * 400)
+        Books.objects.filter(id=first.candidate_id).update(description="None")
+        sheet, _ = write_judging_files([first], self.out)
+        with open(sheet, encoding="utf-8-sig", newline="") as f:
+            row = next(csv.DictReader(f))
+        self.assertEqual(len(row["viewed_description"]), 300)
+        self.assertEqual(row["candidate_description"], "")
