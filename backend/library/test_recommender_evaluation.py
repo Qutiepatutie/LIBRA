@@ -223,7 +223,7 @@ class CoverageAndExplainTests(RecommenderFixtures, TestCase):
     def test_explain_command_prints_total(self):
         out = io.StringIO()
         call_command("explain_recommendation", self.t.id, self.t2.id, stdout=out)
-        self.assertRegex(out.getvalue(), r"TOTAL SCORE = [0-9].\d{4}")
+        self.assertRegex(out.getvalue(), r"TOTAL SCORE = [01]\.\d{4}")
 
     def test_evaluate_command_end_to_end(self):
         src = tempfile.TemporaryDirectory()
