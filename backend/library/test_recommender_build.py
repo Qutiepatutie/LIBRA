@@ -1,6 +1,7 @@
 import collections
 import io
 import math
+from unittest.mock import patch
 
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
@@ -168,6 +169,13 @@ class BuildTests(RecommenderFixtures, TestCase):
         before = list(BookRecommendation.objects.values_list("book_id", "recommended_id", "rank", "score"))
         rebuild_recommendations()
         self.assertEqual(before, list(BookRecommendation.objects.values_list("book_id", "recommended_id", "rank", "score")))
+
+    def test_chunk_size_does_not_change_the_output(self):
+        fields = ("book_id", "recommended_id", "rank", "score", "matched_terms")
+        before = list(BookRecommendation.objects.order_by("book_id", "rank").values_list(*fields))
+        with patch("library.recommender.build.CHUNK_ROWS", 2):
+            rebuild_recommendations()
+        self.assertEqual(before, list(BookRecommendation.objects.order_by("book_id", "rank").values_list(*fields)))
 
 
 class SmallCatalogTests(RecommenderFixtures, TestCase):

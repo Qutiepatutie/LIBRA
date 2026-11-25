@@ -2,6 +2,7 @@ import logging
 import time
 from dataclasses import dataclass
 
+import numpy as np
 import scipy.sparse
 from django.db import connection, transaction
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -75,11 +76,14 @@ def load_catalog():
 
 
 def pair_contributions(catalog, i, j):
-    row_i = catalog.matrix[i]
-    row_j = catalog.matrix[j]
-    weights_i = dict(zip(row_i.indices, row_i.data))
+    matrix = catalog.matrix
+    indptr, indices, data = matrix.indptr, matrix.indices, matrix.data
+    start_i, end_i = indptr[i], indptr[i + 1]
+    start_j, end_j = indptr[j], indptr[j + 1]
+    weights_i = dict(zip(indices[start_i:end_i].tolist(), data[start_i:end_i].tolist()))
     terms = catalog.terms
-    result = [(str(terms[k]), float(weights_i[k] * w)) for k, w in zip(row_j.indices, row_j.data) if k in weights_i]
+    result = [(str(terms[k]), float(weights_i[k] * w))
+              for k, w in zip(indices[start_j:end_j].tolist(), data[start_j:end_j].tolist()) if k in weights_i]
     result.sort(key=lambda item: (-item[1], item[0]))
     return result
 
@@ -90,26 +94,35 @@ def _matched_terms(catalog, i, j):
             for term, weight in pair_contributions(catalog, i, j)[:MAX_TERMS]]
 
 
+def _top_candidates(row, i, work_of, ids):
+    mask = (row > 0) & (work_of != work_of[i])
+    mask[i] = False
+    candidates = np.flatnonzero(mask)
+    if len(candidates) > TOP_K:
+        scores = row[candidates]
+        kth = scores[np.argpartition(scores, -TOP_K)[-TOP_K]]
+        candidates = candidates[scores >= kth]          # keep every tie with the TOP_K-th score
+    order = np.lexsort((ids[candidates], -row[candidates]))   # score desc, then book id asc
+    return candidates[order][:TOP_K].tolist()
+
+
 def _build_rows(catalog):
     rows = []
     if catalog.matrix is None:
         return rows
     matrix = catalog.matrix
     transposed = matrix.T.tocsc()
-    ids = [b.id for b in catalog.books]
-    for start in range(0, len(ids), CHUNK_ROWS):
+    book_ids = [b.id for b in catalog.books]
+    ids = np.array(book_ids)
+    work_numbers = {}
+    work_of = np.array([work_numbers.setdefault(d.work_key, len(work_numbers)) for d in catalog.documents])
+    for start in range(0, len(book_ids), CHUNK_ROWS):
         scores = (matrix[start:start + CHUNK_ROWS] @ transposed).toarray()
         for offset, row in enumerate(scores):
             i = start + offset
-            key = catalog.documents[i].work_key
-            candidates = [
-                int(j) for j in row.nonzero()[0]
-                if j != i and row[j] > 0 and catalog.documents[j].work_key != key
-            ]
-            candidates.sort(key=lambda j: (-row[j], ids[j]))
-            for rank, j in enumerate(candidates[:TOP_K], start=1):
+            for rank, j in enumerate(_top_candidates(row, i, work_of, ids), start=1):
                 rows.append(BookRecommendation(
-                    book_id=ids[i], recommended_id=ids[j], rank=rank, score=float(row[j]),
+                    book_id=book_ids[i], recommended_id=book_ids[j], rank=rank, score=float(row[j]),
                     matched_terms=_matched_terms(catalog, i, j),
                 ))
     return rows

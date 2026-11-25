@@ -137,8 +137,14 @@ Measured on a throwaway local Postgres (not the live database), 300 generated ti
 with 40-word descriptions: `items=300 works=300 vocabulary=58 pairs=3600 seconds=1.05`
 (two runs, 1.05 s each, on a developer laptop). The vocabulary is small because the
 generated text reuses about 60 words, so a real catalog will have a larger vocabulary and
-a different timing; re-measure on the real catalog after the school import. The spec
-estimates 1 to 3 s for 5,000 titles, which is not measured.
+a different timing; re-measure on the real catalog after the school import.
+
+Synthetic 5,000-title benchmark (no database; generated text, not the school's catalog):
+5,000 documents with 20 to 40 description words each, vocabulary 3,867, 60,000 saved
+pairs. Scoring, top-12 selection, reason terms and building the unsaved rows
+(`_build_rows`) took about 1.5 s on a developer laptop, down from 23 to 46 s before the
+candidate selection and reason-term lookups were vectorised. Loading the catalog,
+fitting the vectorizer and writing the rows to Postgres come on top of that.
 
 When rebuilds regularly take more than about 5 seconds, move the rebuild out of the
 save request (run it after the response or on a short schedule). The table and the API
