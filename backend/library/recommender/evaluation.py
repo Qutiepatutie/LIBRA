@@ -120,3 +120,118 @@ def read_key(path):
                    row["viewed_type"], float(row["score"]), int(row["rank"]), row["group"])
             for row in csv.DictReader(f)
         ]
+
+
+BAND_WIDTH = 0.05
+GOOD_SHARE = 0.70
+MIN_BAND_PAIRS = 5
+THESIS = "thesis"
+
+
+def majority_votes(sheet_paths):
+    tally = {}
+    for path in sheet_paths:
+        with open(path, encoding="utf-8-sig", newline="") as f:
+            for row in csv.DictReader(f):
+                answer = (row.get("good") or "").strip().lower()
+                if answer in ("y", "yes"):
+                    vote = 0
+                elif answer in ("n", "no"):
+                    vote = 1
+                else:
+                    continue
+                counts = tally.setdefault(int(row["pair"]), [0, 0])
+                counts[vote] += 1
+    return {pair: yes > no for pair, (yes, no) in tally.items()}
+
+
+@dataclass(frozen=True)
+class Band:
+    low: float
+    pairs: int
+    good: int
+
+    @property
+    def share(self):
+        return self.good / self.pairs
+
+
+def band_table(rows, votes, viewed_type=None):
+    counts = {}
+    for r in rows:
+        if r.group != "A" or r.pair not in votes:
+            continue
+        if viewed_type is not None and r.viewed_type != viewed_type:
+            continue
+        index = min(int(r.score / BAND_WIDTH + 1e-9), 19)
+        pairs, good = counts.get(index, (0, 0))
+        counts[index] = (pairs + 1, good + (1 if votes[r.pair] else 0))
+    return [Band(round(i * BAND_WIDTH, 2), pairs, good) for i, (pairs, good) in sorted(counts.items())]
+
+
+def suggest_tau(bands):
+    for band in bands:
+        if band.pairs >= MIN_BAND_PAIRS and band.share >= GOOD_SHARE:
+            return band.low
+    return None
+
+
+def _tau_for(viewed_type, tau, tau_thesis):
+    return tau_thesis if viewed_type == THESIS and tau_thesis is not None else tau
+
+
+def precision_at_4(rows, votes, tau, tau_thesis=None):
+    per_title = {}
+    for r in rows:
+        if r.group == "B" and r.score >= _tau_for(r.viewed_type, tau, tau_thesis):
+            per_title.setdefault(r.viewed_id, []).append(r)
+    precisions = []
+    for title_rows in per_title.values():
+        shown = [r for r in sorted(title_rows, key=lambda r: r.rank)[:4] if r.pair in votes]
+        if shown:
+            precisions.append(sum(votes[r.pair] for r in shown) / len(shown))
+    if not precisions:
+        return None, 0
+    return sum(precisions) / len(precisions), len(precisions)
+
+
+def coverage(tau, tau_thesis=None):
+    types = dict(Books.objects.filter(is_archived=False).values_list("id", "item_type"))
+    if not types:
+        return 0.0
+    covered = set()
+    saved = BookRecommendation.objects.filter(book_id__in=types).values_list("book_id", "score")
+    for book_id, score in saved:
+        if score >= _tau_for(types[book_id], tau, tau_thesis):
+            covered.add(book_id)
+    return len(covered) / len(types)
+
+
+def top4_scores():
+    saved = (BookRecommendation.objects.filter(rank__lte=4, book__is_archived=False)
+             .order_by("book_id", "rank").values_list("book_id", "book__item_type", "rank", "score"))
+    return list(saved)
+
+
+def explain_pair(book_id, candidate_id):
+    from library.recommender.build import load_catalog, pair_contributions
+
+    catalog = load_catalog()
+    index = {book.id: n for n, book in enumerate(catalog.books)}
+    if catalog.vectorizer is None or book_id not in index or candidate_id not in index:
+        raise ValueError("Both titles must be active and the catalog must have a vocabulary.")
+    i, j = index[book_id], index[candidate_id]
+    analyzer = catalog.vectorizer.build_analyzer()
+    tokens_a = analyzer(catalog.documents[i].text)
+    tokens_b = analyzer(catalog.documents[j].text)
+    vocabulary = catalog.vectorizer.vocabulary_
+    idf = catalog.vectorizer.idf_
+    terms = []
+    for term, contribution in pair_contributions(catalog, i, j):
+        k = vocabulary[term]
+        terms.append({
+            "term": term, "tf_a": tokens_a.count(term), "tf_b": tokens_b.count(term),
+            "idf": float(idf[k]), "weight_a": float(catalog.matrix[i, k]),
+            "weight_b": float(catalog.matrix[j, k]), "contribution": contribution,
+        })
+    return {"score": sum(t["contribution"] for t in terms), "terms": terms}
