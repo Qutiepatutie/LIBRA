@@ -105,7 +105,7 @@ DATABASES = {'default': {
 
 - [ ] **Step 4: Install scikit-learn and supabase into the shared venv.** `C:/github25/bookly-lms/backend/venv/Scripts/python.exe -m pip install scikit-learn==1.9.1 supabase`. Expected: `Successfully installed` including scipy (numpy 2.4.2 is already there). `supabase` is in `dev-requirements.txt` but missing from the venv; `library/supabase_client.py` imports it.
 
-- [ ] **Step 5: Baseline.** Run `TEST library books`. Expected: all tests pass (the 9 `addBook/` tests that failed with 415 before were fixed on main for multipart). Record the count; if any fail, stop and report before changing code.
+- [ ] **Step 5: Baseline.** Run `TEST library books`. Expected on `003f53a`: 160 tests, 8 failures and 1 error, all in `library.tests` (`CatalogCopyTests` add-book tests and `ItemIdentityTests.test_books_still_require_a_unique_isbn` / `test_two_theses_without_isbn_can_be_added`): they post JSON to the multipart-only `addBook/` and get 415. They are a known baseline that this branch does not fix. Any other failure: stop and report before changing code.
 
 ---
 
@@ -644,7 +644,7 @@ Each stub line above is a full test: the comment gives the request and the two a
 
 - [ ] **Step 2: Run** `TEST library.test_recommender_refresh`. Expected: failures (`rebuild` never called).
 - [ ] **Step 3: Implement** `_refresh_recommendations` and the call sites.
-- [ ] **Step 4: Run** `TEST library`. Expected: the whole suite passes (existing add/edit/remove tests now run a real rebuild).
+- [ ] **Step 4: Run** `TEST library`. Expected: no failures beyond the Task 0 baseline's 9 known `addBook/` failures (existing add/edit/remove tests now run a real rebuild).
 - [ ] **Step 5: Commit** with message `Rebuild recommendations when the catalog text changes`.
 
 ---
@@ -899,7 +899,7 @@ Behavior:
 `backend/RECOMMENDER.md` (same style as `ADMIN_ANALYTICS.md`) covers: what the feature does in three sentences; the endpoint with a sample response for a student and for an admin; the two environment variables and their fallback; when rebuilds happen; the four commands with one example each; deploy steps (`pip install -r requirements.txt`, `migrate`, `rebuild_recommendations`, set `RECOMMENDER_MIN_SCORE` on the host); that `DEWEY_DIVISIONS` must be checked against OCLC's DDC 23 summaries before the defense; the privacy rule for judging files; the upgrade path when a rebuild takes more than about 5 seconds; and the black-box cases RC-01 to RC-11 from spec section 12.
 
 - [ ] **Step 1: Write** `backend/RECOMMENDER.md`.
-- [ ] **Step 2: Run the whole backend suite.** `TEST library accounts books`. Expected: the Task 0 baseline count plus the new tests, 0 failures.
+- [ ] **Step 2: Run the whole backend suite.** `TEST library accounts books`. Expected: the Task 0 baseline count plus the new tests, with only the 9 known baseline failures.
 - [ ] **Step 3: Time a build on realistic data.** In a `manage.py shell --settings=recommender_pg` session against the throwaway database (after `migrate --settings=recommender_pg`), create 300 titles with varied text and run `rebuild_recommendations()`. Record `BuildStats.seconds` in `RECOMMENDER.md`. Never run this against the live database.
 - [ ] **Step 4: Black-box walk-through.** Start the backend with `runserver --settings=recommender_pg` and the frontend with `npm run dev` pointed at it (`VITE_API_URL`), create one admin and one student, add a handful of related titles through the app, and walk RC-01 to RC-11 as a student (the slot is student-only; RC-07 checks the admin score through the API response instead of the screen). Record pass or fail per case in `RECOMMENDER.md`. If a browser is not available to the worker, say so in the report and leave the table marked "not run"; do not mark cases as passed without running them.
 - [ ] **Step 5: Commit** with message `Document recommender operations and test cases`.
