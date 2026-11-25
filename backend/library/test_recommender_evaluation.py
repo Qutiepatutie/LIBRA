@@ -11,7 +11,7 @@ from django.core.management.base import CommandError
 from django.test import SimpleTestCase, TestCase
 
 from library.models import BookRecommendation, Books, ItemType
-from library.recommender.build import rebuild_recommendations
+from library.recommender.build import load_catalog, rebuild_recommendations
 from library.recommender.evaluation import (
     SHEET_COLUMNS, Band, KeyRow, _quotas, band_table, coverage, ensure_outside_repo, explain_pair,
     majority_votes, precision_at_4, read_key, sample_pairs, suggest_tau, write_judging_files,
@@ -213,6 +213,17 @@ class CoverageAndExplainTests(RecommenderFixtures, TestCase):
         first = result["terms"][0]
         self.assertAlmostEqual(first["weight_a"] * first["weight_b"], first["contribution"], delta=1e-12)
         self.assertGreaterEqual(first["tf_a"], 1)
+
+    def test_explanation_shows_weights_before_and_after_normalisation(self):
+        result = explain_pair(self.a.id, self.b.id)
+        self.assertTrue(result["terms"])
+        first = result["terms"][0]
+        self.assertNotAlmostEqual(first["weight_a"], first["weight_b"], delta=1e-6)   # uneven pair
+        self.assertAlmostEqual(first["weight_a"], first["tfidf_a"] / result["norm_a"], delta=1e-9)
+        self.assertAlmostEqual(first["weight_b"], first["tfidf_b"] / result["norm_b"], delta=1e-9)
+        self.assertAlmostEqual(first["tfidf_a"], first["tf_a"] * first["idf"], delta=1e-12)
+        vectorizer = load_catalog().vectorizer
+        self.assertAlmostEqual(first["idf"], vectorizer.idf_[vectorizer.vocabulary_[first["term"]]], delta=1e-12)
 
     def test_explaining_an_archived_title_fails_cleanly(self):
         with self.assertRaises(ValueError):

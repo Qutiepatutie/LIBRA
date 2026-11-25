@@ -1,3 +1,4 @@
+import collections
 import csv
 import math
 import random
@@ -226,12 +227,20 @@ def explain_pair(book_id, candidate_id):
     tokens_b = analyzer(catalog.documents[j].text)
     vocabulary = catalog.vectorizer.vocabulary_
     idf = catalog.vectorizer.idf_
+
+    def norm(tokens):
+        counts = collections.Counter(t for t in tokens if t in vocabulary)
+        return math.sqrt(sum((count * idf[vocabulary[t]]) ** 2 for t, count in counts.items()))
+
     terms = []
     for term, contribution in pair_contributions(catalog, i, j):
         k = vocabulary[term]
+        tf_a, tf_b = tokens_a.count(term), tokens_b.count(term)
         terms.append({
-            "term": term, "tf_a": tokens_a.count(term), "tf_b": tokens_b.count(term),
-            "idf": float(idf[k]), "weight_a": float(catalog.matrix[i, k]),
-            "weight_b": float(catalog.matrix[j, k]), "contribution": contribution,
+            "term": term, "tf_a": tf_a, "tf_b": tf_b, "idf": float(idf[k]),
+            "tfidf_a": float(tf_a * idf[k]), "tfidf_b": float(tf_b * idf[k]),
+            "weight_a": float(catalog.matrix[i, k]), "weight_b": float(catalog.matrix[j, k]),
+            "contribution": contribution,
         })
-    return {"score": sum(t["contribution"] for t in terms), "terms": terms}
+    return {"score": sum(t["contribution"] for t in terms), "norm_a": norm(tokens_a),
+            "norm_b": norm(tokens_b), "terms": terms}
