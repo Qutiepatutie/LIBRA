@@ -30,6 +30,7 @@ class Catalog:
     works: int
     vectorizer: TfidfVectorizer | None
     matrix: scipy.sparse.csr_matrix | None
+    terms: list[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -62,20 +63,22 @@ def load_catalog():
             representatives[doc.work_key] = index
     vectorizer = make_vectorizer()
     matrix = None
+    terms = None
     try:
         vectorizer.fit([documents[i].text for i in representatives.values()])
         matrix = vectorizer.transform([d.text for d in documents]).tocsr()
+        terms = vectorizer.get_feature_names_out().tolist()
     except ValueError:
         vectorizer = None
     return Catalog(books=books, documents=documents, works=len(representatives),
-                   vectorizer=vectorizer, matrix=matrix)
+                   vectorizer=vectorizer, matrix=matrix, terms=terms)
 
 
 def pair_contributions(catalog, i, j):
     row_i = catalog.matrix[i]
     row_j = catalog.matrix[j]
     weights_i = dict(zip(row_i.indices, row_i.data))
-    terms = catalog.vectorizer.get_feature_names_out()
+    terms = catalog.terms
     result = [(str(terms[k]), float(weights_i[k] * w)) for k, w in zip(row_j.indices, row_j.data) if k in weights_i]
     result.sort(key=lambda item: (-item[1], item[0]))
     return result
