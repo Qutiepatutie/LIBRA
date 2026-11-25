@@ -75,7 +75,7 @@ def autofillBookInfo(request):
     desc = ""
     works = work_data.get("works") or []
     works_key = works[0].get("key") if works and isinstance(works[0], dict) else None
-    if works_key:
+    if isinstance(works_key, str) and re.fullmatch(r"/works/OL\d+W", works_key):
         try:
             works_response = requests.get(f"https://openlibrary.org{works_key}.json", timeout=5)
             works_response.raise_for_status()

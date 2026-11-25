@@ -36,7 +36,10 @@ class AutofillTests(RecommenderFixtures, TestCase):
                 "subjects": [{"name": f"S{n}"} for n in range(20)],
             }}
 
+        self.requested = []
+
         def fake_get(url, **kwargs):
+            self.requested.append(url)
             if "api/books?bibkeys=" in url:
                 return FakeResponse(isbn_payload)
             if "/books/OL1M.json" in url:
@@ -72,6 +75,15 @@ class AutofillTests(RecommenderFixtures, TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["book"]["description"], "From the edition")
+
+    def test_malformed_works_key_is_never_requested(self):
+        response = self.get_autofill(
+            edition={"works": [{"key": "@other.example/x"}], "description": "From the edition"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["book"]["description"], "From the edition")
+        self.assertEqual(len(self.requested), 2)
+        self.assertTrue(all("other.example" not in u for u in self.requested))
 
     def test_no_description_is_an_empty_string(self):
         response = self.get_autofill()
