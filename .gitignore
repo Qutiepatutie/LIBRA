@@ -36,6 +36,7 @@ lerna-debug.log*
 backend/.env
 frontend/.env.development
 .env.local
+.env.recommender-test
 
 #Test and Notes
 /Notes
