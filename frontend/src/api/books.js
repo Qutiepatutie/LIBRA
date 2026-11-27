@@ -52,6 +52,16 @@ export async function getBooks() {
     }
 }
 
+export async function getRecommendations(bookId) {
+    try {
+        const resp = await authFetch(`${API_URL}/getRecommendations/?book_id=${bookId}`);
+
+        return await returnData(resp);
+    } catch {
+        return ({"status": 500, "message":"Connection to Server Failed"});
+    }
+}
+
 export async function editBook(data){
     try {
         const resp = await authFetch(`${API_URL}/editBook/`, {

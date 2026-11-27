@@ -6,7 +6,7 @@ from django.http import HttpResponse
 from django.utils import timezone
 from django.db import IntegrityError, transaction
 from django.core.exceptions import ValidationError
-from django.db.models import Exists, F, OuterRef, Prefetch
+from django.db.models import F
 
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -20,13 +20,23 @@ from .models import BookCopy, Books, BorrowRecords, UserProfile, RoomReservation
 from .serializers import AllBorrowRecordSerializer, UserBorrowRecordSerializer, BooksSerializer, AddBooksSerializer, RoomReservationSerializer
 from .serializers import CopyFieldsSerializer, CopyRefSerializer, CopySerializer
 from .serializers import DashboardLoanSerializer, DashboardPageQuerySerializer, CirculationQuerySerializer, BorrowersQuerySerializer
-from .copies import HOLD_STATUSES, assign_copy, available_copies, next_copy_number, with_copy_counts
+from .copies import HOLD_STATUSES, assign_copy, available_copies, catalog_books, next_copy_number, with_availability
+from .recommender.build import rebuild_recommendations
+from .recommender.serve import recommendations_for
 from . import admin_analytics, inventory_analytics, borrower_analytics, user_analytics
 from .image_upload import upload_book_cover,delete_book_cover
 
 COPY_FIELDS = ("accession_number", "condition", "date_acquired")
 
 logger = logging.getLogger(__name__)
+recommender_logger = logging.getLogger("library.recommender")
+
+def _refresh_recommendations():
+    """Rebuild the recommendations after a catalog change; a failed rebuild never fails the save."""
+    try:
+        rebuild_recommendations()
+    except Exception:
+        recommender_logger.exception("recommendation rebuild failed")
 
 def _is_admin(request):
     # The same JWT role test the admin-only endpoints use.
@@ -57,10 +67,6 @@ def _borrower_profile(request, key, denied_message):
         return None, Response({"message":"User not found"}, status=status.HTTP_404_NOT_FOUND)
     return profile, None
 
-def with_availability(copies_qs):
-    """Annotate is_available from the single rule in copies.py, so listing copies costs no query per copy."""
-    return copies_qs.annotate(is_available=Exists(available_copies().filter(pk=OuterRef("pk"))))
-
 def _copy_payload(copy):
     return CopySerializer(with_availability(BookCopy.objects.filter(pk=copy.pk)).get()).data
 
@@ -78,13 +84,24 @@ def _accession_taken():
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_books(request):
-    listed = with_availability(BookCopy.objects.filter(is_archived=False)).order_by("copy_number")
-    books = with_copy_counts(Books.objects.filter(is_archived=False)).prefetch_related(
-        Prefetch("copies", queryset=listed, to_attr="listed_copies"),
-    )
+    books = catalog_books(Books.objects.filter(is_archived=False))
 
     serializer = BooksSerializer(books, many=True)
     return Response({"data": serializer.data}, status=status.HTTP_200_OK)
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_recommendations(request):
+    try:
+        book_id = int(request.query_params.get("book_id"))
+    except (TypeError, ValueError):
+        return Response({"message": "Missing book_id"}, status=status.HTTP_400_BAD_REQUEST)
+
+    book = Books.objects.filter(pk=book_id, is_archived=False).first()
+    if book is None:
+        return Response({"message": "Book not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({"data": recommendations_for(book, include_score=_is_admin(request))}, status=status.HTTP_200_OK)
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated, IsAdminRole])
@@ -105,6 +122,7 @@ def add_books(request):
         if book.is_archived:
             book.is_archived = False
             book.save(update_fields=["is_archived"])
+            _refresh_recommendations()
 
             return Response({'message':'Book Successfully Added!'}, status=status.HTTP_200_OK)
             
@@ -162,6 +180,8 @@ def add_books(request):
 
         raise
 
+    _refresh_recommendations()
+
     return Response({'message':'Book Successfully Added!'}, status=status.HTTP_201_CREATED)
 
 def _requested_id(request, key):
@@ -201,6 +221,8 @@ def edit_book(request):
     if item_type not in ItemType.values:
         return Response({"message":"Invalid item type"}, status=status.HTTP_400_BAD_REQUEST)
 
+    text_before = (book.title, book.author, book.tags, book.description, book.call_number)
+
     book.description = request.data.get("description", book.description)
     book.title = request.data.get("title", book.title)
     book.author = request.data.get("author", book.author)
@@ -212,6 +234,9 @@ def edit_book(request):
     book.item_type = item_type
 
     book.save()
+
+    if (book.title, book.author, book.tags, book.description, book.call_number) != text_before:
+        _refresh_recommendations()
 
     return Response ({"message":"Book Successfully Edited"}, status=status.HTTP_200_OK)
 
@@ -230,6 +255,7 @@ def remove_book(request):
 
     book.is_archived = True
     book.save(update_fields=["is_archived"])
+    _refresh_recommendations()
 
     return Response({"message":"Book successfully removed"}, status=status.HTTP_200_OK)
 

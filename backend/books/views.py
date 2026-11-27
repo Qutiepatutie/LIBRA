@@ -9,6 +9,16 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 
+from library.recommender.preprocess import MAX_TAGS
+
+
+def _description_text(raw_desc):
+    # Open Library descriptions are either a string or {"type": ..., "value": ...}
+    if isinstance(raw_desc, dict):
+        raw_desc = raw_desc.get("value")
+    return raw_desc.strip() if isinstance(raw_desc, str) else ""
+
+
 # Create your views here.
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -50,22 +60,31 @@ def autofillBookInfo(request):
     work_data = work_response.json()
 
     subjectNames = book_data.get("subjects") or []
-    subjects = list({s["name"].strip() for s in subjectNames})
+    subjects = []
+    for s in subjectNames:
+        name = s["name"].strip()
+        if name and name not in subjects:
+            subjects.append(name)
+    subjects = subjects[:MAX_TAGS]
 
     publishDate = book_data.get("publish_date") or ""
 
     # Format date
     yearPublished = re.sub(r"[^0-9]", "", publishDate)[-4:] or "Unknown"
 
-    raw_desc = work_data.get("description")
-    
-    if isinstance(raw_desc, dict):
-        desc = raw_desc.get("value") or "None"
-    elif isinstance(raw_desc, str):
-        desc = raw_desc
-    else:
-        desc = "None"
-        
+    desc = ""
+    works = work_data.get("works") or []
+    works_key = works[0].get("key") if works and isinstance(works[0], dict) else None
+    if isinstance(works_key, str) and re.fullmatch(r"/works/OL\d+W", works_key):
+        try:
+            works_response = requests.get(f"https://openlibrary.org{works_key}.json", timeout=5)
+            works_response.raise_for_status()
+            desc = _description_text(works_response.json().get("description"))
+        except (requests.RequestException, ValueError, AttributeError):
+            desc = ""
+    if not desc:
+        desc = _description_text(work_data.get("description"))
+
     # Format fields 
     title = book_data.get("title") or "Unknown"
     authors = book_data.get("authors") or []

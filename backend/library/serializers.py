@@ -42,7 +42,7 @@ class CopySerializer(serializers.ModelSerializer):
         fields = ["id", "copy_number", "accession_number", "condition", "date_acquired", "is_available"]
 
     def get_is_available(self, copy):
-        # Listings annotate is_available (see views.with_availability) so a page of copies costs no extra queries.
+        # Listings annotate is_available (see copies.with_availability) so a page of copies costs no extra queries.
         if hasattr(copy, "is_available"):
             return copy.is_available
         return available_copies().filter(pk=copy.pk).exists()
@@ -50,7 +50,7 @@ class CopySerializer(serializers.ModelSerializer):
 class BooksSerializer(BookTitleSerializer):
     total_copies = serializers.IntegerField(read_only=True)
     available_copies = serializers.IntegerField(read_only=True)
-    # Filled by the get_books Prefetch: non-archived copies, by copy number.
+    # Filled by the Prefetch in copies.catalog_books: non-archived copies, by copy number.
     copies = CopySerializer(source="listed_copies", many=True, read_only=True)
 
     class Meta(BookTitleSerializer.Meta):

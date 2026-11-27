@@ -1,7 +1,6 @@
 import styles from "../../../styles/library/showBook/showbook.module.css"
 import close from "../../../assets/close-icon.svg"
 import trash from "../../../assets/pages/library/trash.svg"
-import libby from "../../../assets/pages/library/libby.svg"
 
 import { useState, useEffect } from "react";
 
@@ -16,12 +15,12 @@ import { getStorage } from "../../../pages/auth/auth.util.js";
 import Toast from "../../ui/Toast.jsx"
 import ConfirmBorrowPanel from "../ConfirmBorrowPanel.jsx";
 import ConfirmRemovePanel from "./ConfirmRemovePanel.jsx";
-import BookPanel from "../BookPanel.jsx"
+import RecommendedBooks from "./RecommendedBooks.jsx";
 
 // Statuses that hold an item; the backend refuses a new borrow for any of them.
 const OPEN_LOAN_STATUSES = ["Pending", "Active", "Due", "Overdue"];
 
-export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBook, allBorrowers, setAllBorrowers, refreshBooks }){
+export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBook, setActiveBook, allBorrowers, setAllBorrowers, refreshBooks }){
     const role = getStorage().getItem("role");
 
     const notify = () => {
@@ -277,18 +276,11 @@ export default function ShowBook({ currBook, onConfirmEdit, showBook, setShowBoo
                             <div className={styles.recommendationContainer}>
                                 {/* <p className={styles.header}>Recommended Books</p>*/}
                                 <div className={styles.recommendations}>
-                                    {/* {Array.from({ length: 10 }).map((book, index) => (
-                                        <BookPanel
-                                            key={index}
-                                            book={book}
-                                        />
-                                    ))}*/}
-                                    
-                                    {/* TEMP*/}
-                                    <div className={styles.comingSoonContainer}>
-                                        <img src={libby} />
-                                        <p>Book recommendations will be coming soon!</p>
-                                    </div>
+                                    <RecommendedBooks
+                                        bookId={currBook.id}
+                                        setActiveBook={setActiveBook}
+                                        setShowBook={setShowBook}
+                                    />
                                 </div>
                             </div>
                         )}

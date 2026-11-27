@@ -174,3 +174,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Minimum cosine score for a recommendation; raw strings, parsed where used.
+RECOMMENDER_MIN_SCORE = os.environ.get("RECOMMENDER_MIN_SCORE", "0.10")
+RECOMMENDER_MIN_SCORE_THESIS = os.environ.get("RECOMMENDER_MIN_SCORE_THESIS", "")
